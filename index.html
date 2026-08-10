@@ -873,6 +873,18 @@ if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",
 </script>
 
 <!-- SHARED_MEDAL_HOOK_DEPLOYED_20260810 -->
+
+<!-- SF_LIVE_PROGRESS_REFRESH_V1 -->
+<script>
+(function(){
+  const KEY='sportsFiestaHubProgress_v1';
+  function refreshHub(){ if(typeof renderAll==='function') renderAll(); }
+  window.addEventListener('storage',function(e){ if(e.key===KEY) refreshHub(); });
+  window.addEventListener('focus',refreshHub);
+  document.addEventListener('visibilitychange',function(){ if(!document.hidden) refreshHub(); });
+})();
+</script>
+
 </body>
 </html>
 
