@@ -14,12 +14,9 @@ repls={
 for a,b in repls.items():
     s=s.replace(a,b)
 
-# Replace an earlier cover if this patch is re-run.
+# Cover markers. Keep an existing cover intact so reruns are idempotent.
 start='<!-- SPORTS_FIESTA_COVER_START -->'
 end='<!-- SPORTS_FIESTA_COVER_END -->'
-if start in s and end in s:
-    a=s.index(start); b=s.index(end)+len(end)
-    s=s[:a]+s[b:]
 
 css=r'''
 /* SPORTS FIESTA COVER */
@@ -56,7 +53,11 @@ if '/* SPORTS FIESTA COVER */' not in s:
 sports=[('🏃','Running'),('🎯','Javelin Throw'),('🎳','Bowling'),('🏋️','Weightlifting'),('⚫','Shot Put'),('🏊','Swimming'),('🤸💦','Diving'),('🏐🌊','Water Polo'),('⛵','Sailing'),('🏊🚴🏃','Triathlon'),('🔥','Torch Relay')]
 steps=''.join(f'<div class="fc-sport {"tri" if i==10 else ""}"><span class="n">{i}</span><span class="ic">{ic}</span><b>{name}</b></div>' for i,(ic,name) in enumerate(sports,1))
 cover=f'''{start}<section id="fiestaCover"><div class="fc-confetti"></div><div class="fc-wrap"><div class="fc-main"><div class="fc-player"><img id="fcP1" alt="Player 1"><span class="fc-tag fc-p1">PLAYER 1</span></div><div class="fc-center"><div class="fc-trophy">🏆</div><h1><span class="fc-top">LENGTH, MASS &amp; VOLUME</span>SPORTS FIESTA</h1><div class="fc-ribbon">11 SPORTS • 11 MEDAL PIECES • GO FOR GOLD!</div><div class="fc-board">Choose any sports game to practise. Complete all 11 with correct answers as a <b>single player</b> to win the <b>GOLD MEDAL!</b></div><button class="fc-start" id="fcStart">★ START SPORTS FIESTA ★</button></div><div class="fc-player"><img id="fcP2" alt="Player 2"><span class="fc-tag fc-p2">PLAYER 2</span></div></div><div class="fc-track">{steps}</div></div></section>{end}'''
-s=s.replace('<body>','<body class="cover-on">\n'+cover,1)
+if start not in s:
+    if '<body class="cover-on">' in s:
+        s=s.replace('<body class="cover-on">','<body class="cover-on">\n'+cover,1)
+    else:
+        s=s.replace('<body>','<body class="cover-on">\n'+cover,1)
 
 js=r'''
 <script>
