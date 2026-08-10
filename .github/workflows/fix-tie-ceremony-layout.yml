@@ -1,0 +1,32 @@
+name: Fix Tie Ceremony Layout
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Put P1 left and P2 right in tie ceremony
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('index.html')
+          s=p.read_text(encoding='utf-8')
+          marker='/* TIE_CEREMONY_LEFT_RIGHT_V1 */'
+          if marker not in s:
+              css='''\n<style>\n/* TIE_CEREMONY_LEFT_RIGHT_V1 */\n.mc-card.tie #mcPlayer{left:24%!important;width:190px!important;}\n.mc-card.tie #mcPlayer2{left:76%!important;width:190px!important;display:block!important;}\n@media(max-width:620px){\n  .mc-card.tie #mcPlayer{left:23%!important;width:42vw!important;max-width:155px!important;}\n  .mc-card.tie #mcPlayer2{left:77%!important;width:42vw!important;max-width:155px!important;}\n}\n</style>\n'''
+              s=s.replace('</head>',css+'</head>',1)
+              p.write_text(s,encoding='utf-8')
+          PY
+      - name: Commit
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add index.html
+          git commit -m "Show both players left and right for tie ceremony"
+          git push
