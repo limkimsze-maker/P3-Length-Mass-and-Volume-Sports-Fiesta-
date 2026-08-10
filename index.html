@@ -477,6 +477,19 @@ body.cover-on>.app{display:none!important}
 /* SF_REWARD_UPGRADE_END */
 
 </style>
+
+<!-- SF_PROGRESS_SECURITY_HEAD_V1 -->
+<script>
+(function(){
+  try{
+    const u=new URL(location.href);
+    let changed=false;
+    ['report','completed','perfect'].forEach(k=>{if(u.searchParams.has(k)){u.searchParams.delete(k);changed=true;}});
+    if(changed) history.replaceState({},'',u.pathname+(u.searchParams.toString()?'?'+u.searchParams.toString():'')+u.hash);
+  }catch(e){}
+})();
+</script>
+
 </head>
 <body class="cover-on">
 <!-- SPORTS_FIESTA_COVER_START --><section id="fiestaCover"><div class="fc-confetti"></div><div class="fc-wrap"><div class="fc-main"><div class="fc-player"><img id="fcP1" alt="Player 1"><span class="fc-tag fc-p1">PLAYER 1</span></div><div class="fc-center"><div class="fc-trophy">🏆</div><h1><span class="fc-top">LENGTH, MASS &amp; VOLUME</span>SPORTS FIESTA</h1><div class="fc-ribbon">11 SPORTS • 11 MEDAL PIECES • GO FOR GOLD!</div><div class="fc-board">Choose any sports game to practise. Complete all 11 with correct answers as a <b>single player</b> to win the <b>GOLD MEDAL!</b></div><button class="fc-start" id="fcStart">★ START SPORTS FIESTA ★</button><button class="fc-preview" type="button" onclick="unlockCeremonyPreview()">🔒 Preview Gold Medal Ceremony</button></div><div class="fc-player"><img id="fcP2" alt="Player 2"><span class="fc-tag fc-p2">PLAYER 2</span></div></div><div class="fc-track"><div class="fc-sport "><span class="n">1</span><span class="ic">🏃</span><b>Running</b></div><div class="fc-sport "><span class="n">2</span><span class="ic">🎯</span><b>Javelin Throw</b></div><div class="fc-sport "><span class="n">3</span><span class="ic">🎳</span><b>Bowling</b></div><div class="fc-sport "><span class="n">4</span><span class="ic">🏋️</span><b>Weightlifting</b></div><div class="fc-sport "><span class="n">5</span><span class="ic">⚫</span><b>Shot Put</b></div><div class="fc-sport "><span class="n">6</span><span class="ic">🏊</span><b>Swimming</b></div><div class="fc-sport "><span class="n">7</span><span class="ic">🤸💦</span><b>Diving</b></div><div class="fc-sport "><span class="n">8</span><span class="ic">🏐🌊</span><b>Water Polo</b></div><div class="fc-sport "><span class="n">9</span><span class="ic">⛵</span><b>Sailing</b></div><div class="fc-sport tri"><span class="n">10</span><span class="ic">🏊🚴🏃</span><b>Triathlon</b></div><div class="fc-sport "><span class="n">11</span><span class="ic">🔥</span><b>Torch Relay</b></div></div></div></section><!-- SPORTS_FIESTA_COVER_END -->
@@ -590,8 +603,7 @@ body.cover-on>.app{display:none!important}
   <section id="practiceGrid" class="grid"></section>
 
   <div class="footerNote">
-    Suggested automatic game integration: when a game ends, save a result into localStorage using the same key
-    as this hub. Example fields: <code>completed</code> and <code>perfectSingle</code>.
+    Progress is recorded automatically only after a practice reaches its genuine end screen. Replaying a practice is always allowed.
   </div>
 </div>
 
@@ -631,21 +643,29 @@ function ensureState(data, id){
   return data[id];
 }
 
+function isVerifiedProgressState(state){
+  return !!state && state.completed === true && (
+    state.verified === true ||
+    state.source === "game-v5" ||
+    typeof state.lastWinner === "string"
+  );
+}
+
 function getCounts(data){
   let completed = 0;
   let perfect = 0;
   practices.forEach(p=>{
     const s = ensureState(data, p.id);
-    if(s.completed) completed++;
-    if(s.perfectSingle) perfect++;
+    if(isVerifiedProgressState(s)) completed++;
+    if(isVerifiedProgressState(s) && s.perfectSingle) perfect++;
   });
   return {completed, perfect};
 }
 
 function statusInfo(state){
+  if(!isVerifiedProgressState(state)) return {text:"🌟 Not Yet", cls:"statusTodo"};
   if(state.perfectSingle) return {text:"🏅 Perfect 1P", cls:"statusPerfect"};
-  if(state.completed) return {text:"✅ Completed", cls:"statusDone"};
-  return {text:"🌟 Not Yet", cls:"statusTodo"};
+  return {text:"✅ Completed", cls:"statusDone"};
 }
 
 function toggleCompleted(id){
@@ -681,19 +701,7 @@ function reportFromGame(practiceId, completed, perfectSingle){
   renderAll();
 }
 
-// Optional auto-report via URL query, e.g. ?report=11&completed=1&perfect=1
-(function parseReportQuery(){
-  const params = new URLSearchParams(location.search);
-  const report = Number(params.get("report"));
-  if(report){
-    reportFromGame(report, params.get("completed")==="1", params.get("perfect")==="1");
-    params.delete("report");
-    params.delete("completed");
-    params.delete("perfect");
-    const newUrl = location.pathname + (params.toString() ? ("?"+params.toString()) : "");
-    history.replaceState({}, "", newUrl);
-  }
-})();
+// URL-based progress reporting disabled: completion must come from the practice hook.
 
 function renderCards(){
   const data = loadProgress();
@@ -701,7 +709,8 @@ function renderCards(){
   grid.innerHTML = practices.map(p=>{
     const state = ensureState(data, p.id);
     const status = statusInfo(state);
-    const extraClass = state.perfectSingle ? "cardPerfect" : (state.completed ? "cardDone" : "");
+    const verifiedState = isVerifiedProgressState(state);
+    const extraClass = verifiedState && state.perfectSingle ? "cardPerfect" : (verifiedState ? "cardDone" : "");
     return `
       <div class="card ${extraClass}">
         <div class="topRow">
@@ -844,7 +853,7 @@ function finalSound(){[392,523,659,784,1047].forEach((f,i)=>beep(f,.22,i*.1,"tri
 function burst(n){const h=document.getElementById("medalCeremony"),cols=["#ffd43b","#ff5964","#49cfff","#5bdd70","#9d67ff","#fff"];if(!h)return;for(let i=0;i<n;i++){const e=document.createElement("i");e.className="mc-piece";e.style.left=Math.random()*100+"vw";e.style.background=cols[i%cols.length];e.style.setProperty("--dur",2+Math.random()*2+"s");e.style.setProperty("--delay",Math.random()*.4+"s");e.style.setProperty("--drift",Math.random()*240-120+"px");e.style.setProperty("--rot",Math.random()*900-450+"deg");h.appendChild(e);setTimeout(()=>e.remove(),4500)}}
 function imgs(){const a=document.querySelectorAll(".playerImgWrap img.playerSvg");return [a[0]?a[0].src:"",a[1]?a[1].src:""]}
 function data(){try{return JSON.parse(localStorage.getItem("sportsFiestaHubProgress_v1")||"{}")}catch(e){return{}}}
-function perfects(){const d=data();let n=0;for(let i=1;i<=11;i++)if(d[i]&&d[i].perfectSingle)n++;return n}
+function perfects(){const d=data();let n=0;for(let i=1;i<=11;i++)if(d[i]&&d[i].perfectSingle&&isVerifiedProgressState(d[i]))n++;return n}
 function preparePlayers(w){const m=document.getElementById("mcPlayer"),card=document.querySelector("#medalCeremony .mc-card"),src=imgs();if(!m||!card)return;let m2=document.getElementById("mcPlayer2");if(!m2){m2=document.createElement("img");m2.id="mcPlayer2";m2.alt="Player 2";card.querySelector(".mc-stage").appendChild(m2)}card.classList.remove("tie");m2.style.display="none";if(w==="p2")m.src=src[1];else m.src=src[0];if(w==="tie"){card.classList.add("tie");m.src=src[0];m2.src=src[1];m2.style.display="block"}}
 window.showMedalCeremony=function(preview=false,winner="p1",kind="gold"){
   const e=document.getElementById("medalCeremony"),c=e&&e.querySelector(".mc-card");if(!e||!c)return;
@@ -887,6 +896,27 @@ if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",
 </script>
 
 <!-- SF_BACK_HOME_AFTER_COMPLETION_V1 -->
+
+<!-- SF_PROGRESS_SECURITY_RUNTIME_V1 -->
+<script>
+(function(){
+  const blocked=function(){
+    console.warn('Sports Fiesta progress is recorded only after a practice is completed.');
+    return {ok:false,reason:'game-completion-required'};
+  };
+  blocked.__sf=1;
+  window.toggleCompleted=blocked;
+  window.togglePerfect=blocked;
+  window.reportFromGame=blocked;
+  if(window.SportsFiestaAward){
+    window.SportsFiestaAward.record=blocked;
+    window.SportsFiestaAward.reset=blocked;
+  }
+  try{ localStorage.removeItem('sportsFiestaPendingAward_v1'); }catch(e){}
+  if(typeof renderAll==='function') renderAll();
+})();
+</script>
+
 </body>
 </html>
 
