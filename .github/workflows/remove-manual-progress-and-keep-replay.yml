@@ -1,0 +1,56 @@
+name: Remove Manual Progress and Keep Replay
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  update-hub:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Remove manual completion controls and keep replay button active
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+          old = s
+
+          # Make the primary practice button explicitly replayable at all times.
+          s = s.replace('${p.icon} Open Practice', '${p.icon} Play / Replay Practice')
+
+          # Remove the pupil-facing manual "Mark Done" / "Perfect 1P" controls.
+          marker = '<div class="miniRow">'
+          pos = 0
+          while True:
+              start = s.find(marker, pos)
+              if start == -1:
+                  break
+              end = s.find('</div>', start)
+              if end == -1:
+                  break
+              end += len('</div>')
+              block = s[start:end]
+              if 'toggleCompleted' in block or 'togglePerfect' in block:
+                  replacement = '''<div style="margin-top:8px;padding:8px 10px;border-radius:12px;background:#f3f9fd;border:2px solid #dceef9;color:#55748a;font-size:12px;font-weight:800;line-height:1.35;text-align:center;">Progress is saved automatically after you finish the practice. You can replay this practice anytime.</div>'''
+                  s = s[:start] + replacement + s[end:]
+                  pos = start + len(replacement)
+              else:
+                  pos = end
+
+          if s == old:
+              print('No changes needed')
+          else:
+              p.write_text(s, encoding='utf-8')
+              print('Hub updated')
+          PY
+      - name: Commit
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add index.html
+          git commit -m "Require actual practice completion for progress and allow replay"
+          git push
