@@ -1,0 +1,61 @@
+name: Harden Sports Fiesta Medal Hook
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/harden-medal-hook.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  harden-hook:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tighten genuine end-of-game detection
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p=Path('sports-fiesta-medal-hook-v4.js')
+          s=p.read_text(encoding='utf-8')
+          old=s
+
+          old_result='''  function resultElement(){const list=[...document.querySelectorAll('#results,.results,[id*="result" i],[class*="result" i],.screen.active')];return list.find(el=>visible(el)&&/score|scored|winner|wins|won|champion|complete|finished|great job|results|tie|draw/i.test(el.innerText||''))||null}'''
+          new_result='''  function resultElement(){\n    const list=[...document.querySelectorAll('#results,.results,[id*="result" i],[class*="result" i],.screen.active')];\n    return list.find(el=>{\n      if(!visible(el))return false;\n      const text=(el.innerText||'').replace(/\\s+/g,' ').trim();\n      if(text.length<20)return false;\n      const strongEnd=/winner|wins|won|champion|complete(?:d)?|finished|great job|final score|results|tie|draw|well done/i.test(text);\n      const explicitResult=el.matches('#results,.results,[id*="result" i],[class*="result" i]');\n      const resultProof=/score|scored|\\d+\\s*\\/\\s*\\d+|\\d+\\s+out\\s+of\\s+\\d+/i.test(text);\n      return strongEnd||(explicitResult&&resultProof);\n    })||null;\n  }'''
+          if old_result in s:
+              s=s.replace(old_result,new_result,1)
+          elif 'const strongEnd=' not in s:
+              raise SystemExit('resultElement anchor not found')
+
+          old_update='''  function update(perfect,winner){let data={};try{data=JSON.parse(localStorage.getItem(HUB_KEY)||'{}')||{}}catch(e){}const old=data[PRACTICE_ID]||{};data[PRACTICE_ID]={...old,completed:true,perfectSingle:!!old.perfectSingle||!!perfect,updatedAt:new Date().toISOString(),lastWinner:winner};localStorage.setItem(HUB_KEY,JSON.stringify(data));let completed=0,perfectCount=0;for(let i=1;i<=11;i++){const x=data[i]||{};if(x.completed)completed++;if(x.perfectSingle)perfectCount++}return{completed,perfectCount}}'''
+          new_update='''  function update(perfect,winner){\n    let data={};try{data=JSON.parse(localStorage.getItem(HUB_KEY)||'{}')||{}}catch(e){}\n    const old=data[PRACTICE_ID]||{};\n    data[PRACTICE_ID]={...old,completed:true,perfectSingle:!!old.perfectSingle||!!perfect,verified:true,source:'game-v5',updatedAt:new Date().toISOString(),lastWinner:winner};\n    localStorage.setItem(HUB_KEY,JSON.stringify(data));\n    let completed=0,perfectCount=0;\n    for(let i=1;i<=11;i++){\n      const x=data[i]||{};\n      const verified=x.completed===true&&(x.verified===true||x.source==='game-v5'||typeof x.lastWinner==='string');\n      if(verified)completed++;\n      if(verified&&x.perfectSingle)perfectCount++;\n    }\n    return{completed,perfectCount};\n  }'''
+          if old_update in s:
+              s=s.replace(old_update,new_update,1)
+          elif "source:'game-v5'" not in s:
+              raise SystemExit('update anchor not found')
+
+          # Make the detector identity explicit for later audits while keeping the v4 filename used by all games.
+          if 'SF_MEDAL_HOOK_SECURITY_V5' not in s:
+              s='/* SF_MEDAL_HOOK_SECURITY_V5: verified end-screen completion only */\n'+s
+
+          if s!=old:
+              p.write_text(s,encoding='utf-8')
+              print('Medal hook hardened')
+          else:
+              print('No changes needed')
+          PY
+
+      - name: Commit hardened hook
+        shell: bash
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add sports-fiesta-medal-hook-v4.js
+          git commit -m "Verify genuine game end before awarding medal progress"
+          git push
