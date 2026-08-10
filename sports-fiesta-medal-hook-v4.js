@@ -116,7 +116,7 @@
       if(!visible(el))return false;
       const text=(el.innerText||'').replace(/\s+/g,' ').trim();
       if(text.length<20)return false;
-      const strongEnd=/winner|wins|won|champion|complete(?:d)?|finished|great job|final score|results|tie|draw|well done/i.test(text);
+      const strongEnd=/final score|\bresults\b|\bcompleted\b|\bfinished\b|\bwinner\b|\bwins the\b|\bwon the\b|practice\s+complete|challenge\s+complete|game\s+complete|game\s+over|it(?:'|’)s\s+a\s+draw|tie\s+game/i.test(text);
       const explicitResult=el.matches('#results,.results,[id*="result" i],[class*="result" i]');
       const resultProof=/score|scored|\d+\s*\/\s*\d+|\d+\s+out\s+of\s+\d+/i.test(text);
       return strongEnd||(explicitResult&&resultProof);
@@ -134,7 +134,7 @@
     let completed=0,perfectCount=0;
     for(let i=1;i<=11;i++){
       const x=data[i]||{};
-      const verified=x.completed===true&&(x.verified===true||x.source==='game-v5'||typeof x.lastWinner==='string');
+      const verified=x.completed===true&&x.verified===true&&x.source==='game-v5';
       if(verified)completed++;
       if(verified&&x.perfectSingle)perfectCount++;
     }

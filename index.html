@@ -644,11 +644,8 @@ function ensureState(data, id){
 }
 
 function isVerifiedProgressState(state){
-  return !!state && state.completed === true && (
-    state.verified === true ||
-    state.source === "game-v5" ||
-    typeof state.lastWinner === "string"
-  );
+  return !!state && state.completed === true &&
+    state.verified === true && state.source === "game-v5";
 }
 
 function getCounts(data){
