@@ -713,16 +713,9 @@ function renderCards(){
 
         <div class="buttonCol">
           <a href="${p.url}" target="_blank" rel="noopener">
-            <button class="openBtn" type="button">${p.icon} Open Practice</button>
+            <button class="openBtn" type="button">${p.icon} Play / Replay Practice</button>
           </a>
-          <div class="miniRow">
-            <button type="button" class="secondaryBtn ${state.completed && !state.perfectSingle ? 'activeDone' : ''}" onclick="toggleCompleted(${p.id})">
-              ${state.completed && !state.perfectSingle ? 'Undo Done' : 'Mark Done'}
-            </button>
-            <button type="button" class="secondaryBtn ${state.perfectSingle ? 'activePerfect' : ''}" onclick="togglePerfect(${p.id})">
-              ${state.perfectSingle ? 'Undo 1P' : 'Perfect 1P'}
-            </button>
-          </div>
+          <div style="margin-top:8px;padding:8px 10px;border-radius:12px;background:#f3f9fd;border:2px solid #dceef9;color:#55748a;font-size:12px;font-weight:800;line-height:1.35;text-align:center;">Progress is saved automatically after you finish the practice. You can replay this practice anytime.</div>
         </div>
       </div>
     `;
