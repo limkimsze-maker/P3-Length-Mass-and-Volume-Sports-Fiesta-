@@ -1,3 +1,4 @@
+/* SF_MEDAL_HOOK_SECURITY_V5: verified end-screen completion only */
 (() => {
   const script=document.currentScript;
   const PRACTICE_ID=Number(script?.dataset?.practice||0);
@@ -109,12 +110,36 @@
   installMobileFit();
 
   function visible(el){if(!el)return false;const s=getComputedStyle(el),r=el.getBoundingClientRect();return s.display!=='none'&&s.visibility!=='hidden'&&r.width>0&&r.height>0}
-  function resultElement(){const list=[...document.querySelectorAll('#results,.results,[id*="result" i],[class*="result" i],.screen.active')];return list.find(el=>visible(el)&&/score|scored|winner|wins|won|champion|complete|finished|great job|results|tie|draw/i.test(el.innerText||''))||null}
+  function resultElement(){
+    const list=[...document.querySelectorAll('#results,.results,[id*="result" i],[class*="result" i],.screen.active')];
+    return list.find(el=>{
+      if(!visible(el))return false;
+      const text=(el.innerText||'').replace(/\s+/g,' ').trim();
+      if(text.length<20)return false;
+      const strongEnd=/winner|wins|won|champion|complete(?:d)?|finished|great job|final score|results|tie|draw|well done/i.test(text);
+      const explicitResult=el.matches('#results,.results,[id*="result" i],[class*="result" i]');
+      const resultProof=/score|scored|\d+\s*\/\s*\d+|\d+\s+out\s+of\s+\d+/i.test(text);
+      return strongEnd||(explicitResult&&resultProof);
+    })||null;
+  }
   function readMode(text){try{if(typeof mode!=='undefined'){if(mode===2||mode==='2'||String(mode).toLowerCase().includes('2'))return 2;if(mode===1||mode==='1'||String(mode).toLowerCase().includes('1'))return 1}}catch(e){}try{if(typeof gameMode!=='undefined'){if(String(gameMode).toLowerCase().includes('2'))return 2;if(String(gameMode).toLowerCase().includes('1'))return 1}}catch(e){}return /player\s*2|\bp2\b/i.test(text)?2:1}
   function stateScores(){let a=null,b=null,total=null;try{if(typeof scores!=='undefined'&&Array.isArray(scores)){a=Number(scores[0]);b=Number(scores[1])}}catch(e){}try{if(typeof score1!=='undefined')a=Number(score1)}catch(e){}try{if(typeof score2!=='undefined')b=Number(score2)}catch(e){}try{if(typeof p1Score!=='undefined')a=Number(p1Score)}catch(e){}try{if(typeof p2Score!=='undefined')b=Number(p2Score)}catch(e){}try{if(typeof TOTAL!=='undefined')total=Number(TOTAL)}catch(e){}try{if(typeof totalQuestions!=='undefined')total=Number(totalQuestions)}catch(e){}return{a:Number.isFinite(a)?a:null,b:Number.isFinite(b)?b:null,total:Number.isFinite(total)?total:null}}
   function domScore(sel){const el=document.querySelector(sel);if(!el)return null;const n=(el.textContent.match(/\d+/g)||[]).map(Number);return n.length?n[n.length-1]:null}
   function outcome(text,gm){const s=stateScores();let p1=s.a,p2=s.b,total=s.total;if(p1==null)p1=domScore('.score.p1,.p1.score,#score1,#p1Score');if(p2==null)p2=domScore('.score.p2,.p2.score,#score2,#p2Score');const f=[...text.matchAll(/(\d+)\s*\/\s*(\d+)/g)].map(m=>[+m[1],+m[2]]).filter(x=>x[1]>=5);if(f.length){p1=f[0][0];total=f[0][1]}const out=text.match(/(\d+)\s+out\s+of\s+(\d+)/i);if(out){p1=+out[1];total=+out[2]}let winner='p1';if(gm===2){if(/tie|draw|same score/i.test(text))winner='tie';else if(/player\s*2[^.!]{0,35}(wins|won|winner)|\bp2[^.!]{0,25}(wins|won|winner)/i.test(text))winner='p2';else if(/player\s*1[^.!]{0,35}(wins|won|winner)|\bp1[^.!]{0,25}(wins|won|winner)/i.test(text))winner='p1';else if(p1!=null&&p2!=null)winner=p1===p2?'tie':(p1>p2?'p1':'p2');else winner='tie'}return{winner,perfect:gm===1&&p1!=null&&total!=null&&total>0&&p1===total,p1,p2,total}}
-  function update(perfect,winner){let data={};try{data=JSON.parse(localStorage.getItem(HUB_KEY)||'{}')||{}}catch(e){}const old=data[PRACTICE_ID]||{};data[PRACTICE_ID]={...old,completed:true,perfectSingle:!!old.perfectSingle||!!perfect,updatedAt:new Date().toISOString(),lastWinner:winner};localStorage.setItem(HUB_KEY,JSON.stringify(data));let completed=0,perfectCount=0;for(let i=1;i<=11;i++){const x=data[i]||{};if(x.completed)completed++;if(x.perfectSingle)perfectCount++}return{completed,perfectCount}}
+  function update(perfect,winner){
+    let data={};try{data=JSON.parse(localStorage.getItem(HUB_KEY)||'{}')||{}}catch(e){}
+    const old=data[PRACTICE_ID]||{};
+    data[PRACTICE_ID]={...old,completed:true,perfectSingle:!!old.perfectSingle||!!perfect,verified:true,source:'game-v5',updatedAt:new Date().toISOString(),lastWinner:winner};
+    localStorage.setItem(HUB_KEY,JSON.stringify(data));
+    let completed=0,perfectCount=0;
+    for(let i=1;i<=11;i++){
+      const x=data[i]||{};
+      const verified=x.completed===true&&(x.verified===true||x.source==='game-v5'||typeof x.lastWinner==='string');
+      if(verified)completed++;
+      if(verified&&x.perfectSingle)perfectCount++;
+    }
+    return{completed,perfectCount};
+  }
 
   function ceremony(gm,o,p){
     const full=o.perfect&&p.perfectCount===11;
