@@ -1,0 +1,53 @@
+name: Enforce V5 Verified Progress Only
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/enforce-v5-progress-only.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  enforce:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require v5 records and stricter end screen proof
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          # Hub: accept only records created by the hardened shared hook.
+          p=Path('index.html')
+          s=p.read_text(encoding='utf-8')
+          s=s.replace('''  return !!state && state.completed === true && (\n    state.verified === true ||\n    state.source === "game-v5" ||\n    typeof state.lastWinner === "string"\n  );''','''  return !!state && state.completed === true &&\n    state.verified === true && state.source === "game-v5";''')
+          p.write_text(s,encoding='utf-8')
+
+          # Hook: remove broad mid-game phrases from completion detection and count v5 only.
+          h=Path('sports-fiesta-medal-hook-v4.js')
+          x=h.read_text(encoding='utf-8')
+          x=x.replace(
+            'const strongEnd=/winner|wins|won|champion|complete(?:d)?|finished|great job|final score|results|tie|draw|well done/i.test(text);',
+            "const strongEnd=/final score|\\bresults\\b|\\bcompleted\\b|\\bfinished\\b|\\bwinner\\b|\\bwins the\\b|\\bwon the\\b|practice\\s+complete|challenge\\s+complete|game\\s+complete|game\\s+over|it(?:'|’)s\\s+a\\s+draw|tie\\s+game/i.test(text);"
+          )
+          x=x.replace(
+            "const verified=x.completed===true&&(x.verified===true||x.source==='game-v5'||typeof x.lastWinner==='string');",
+            "const verified=x.completed===true&&x.verified===true&&x.source==='game-v5';"
+          )
+          if 'SF_MEDAL_HOOK_SECURITY_V5' not in x or "source:'game-v5'" not in x:
+              raise SystemExit('Hardened hook marker missing')
+          h.write_text(x,encoding='utf-8')
+          PY
+      - name: Commit v5-only verification
+        shell: bash
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html sports-fiesta-medal-hook-v4.js
+          git commit -m "Accept only verified v5 Sports Fiesta completions"
+          git push
