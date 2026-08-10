@@ -1,0 +1,52 @@
+name: Add Back Home After Completion
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Add Back to Home button to medal ceremony
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('index.html')
+          s=p.read_text(encoding='utf-8')
+          marker='SF_BACK_HOME_AFTER_COMPLETION_V1'
+          if marker in s:
+              print('already patched')
+              raise SystemExit(0)
+
+          css='.mc-home{position:absolute;left:13px;top:58px;z-index:12;border:3px solid #fff;border-radius:14px;padding:9px 12px;background:linear-gradient(#56adff,#267fd9);color:#fff;font-size:13px;font-weight:1000;box-shadow:0 4px #185a9a;white-space:nowrap}.mc-home:active{transform:translateY(2px);box-shadow:0 2px #185a9a}'
+          anchor='.mc-previewTag{display:none;'
+          if anchor not in s:
+              raise SystemExit('CSS anchor not found')
+          s=s.replace(anchor, css+anchor, 1)
+
+          old='<button class="mc-close" type="button" onclick="closeMedalCeremony()">×</button>'
+          new='<button class="mc-home" type="button" onclick="goSportsFiestaHome()">🏠 Back to Home</button>'+old
+          if old not in s:
+              raise SystemExit('ceremony button anchor not found')
+          s=s.replace(old,new,1)
+
+          fn='function closeMedalCeremony()'
+          add="function goSportsFiestaHome(){try{window.top.location.href='https://limkimsze-maker.github.io/P3-Length-Mass-and-Volume-Sports-Fiesta-/';}catch(e){location.href='https://limkimsze-maker.github.io/P3-Length-Mass-and-Volume-Sports-Fiesta-/';}}\n"
+          if fn not in s:
+              raise SystemExit('function anchor not found')
+          s=s.replace(fn,add+fn,1)
+
+          s=s.replace('</body>','<!-- '+marker+' -->\n</body>',1)
+          p.write_text(s,encoding='utf-8')
+          PY
+      - name: Commit
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git commit -m "Add Back to Home button after completion"
+          git push
