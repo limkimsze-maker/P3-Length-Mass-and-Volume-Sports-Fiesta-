@@ -752,7 +752,7 @@ function renderSummary(){
   const medal = document.getElementById("medal");
   const medalInner = document.getElementById("medalInner");
   medal.style.setProperty("--fill", fill.toFixed(2));
-  medalInner.textContent = counts.completed;
+  medalInner.textContent = counts.pieces;
 
   const goldUnlocked = counts.perfect === TOTAL;
   medal.classList.toggle("medalGold", goldUnlocked);
