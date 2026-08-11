@@ -1,4 +1,4 @@
-/* SF_MEDAL_HOOK_SECURITY_V5: verified end-screen completion only */
+/* SF_MEDAL_HOOK_SECURITY_V6: verified end-screen completion + Practice 1 race fix */
 (() => {
   const script=document.currentScript;
   const PRACTICE_ID=Number(script?.dataset?.practice||0);
@@ -109,6 +109,105 @@
   }
   installMobileFit();
 
+  function installPracticeOneRaceRules(){
+    if(PRACTICE_ID!==1)return;
+    try{
+      const DUEL_FINISH=6;
+      let duelRound=1;
+      const baseRestart=restart;
+      const baseRenderQuestion=renderQuestion;
+      const baseFinish=finish;
+
+      updateRace=function(movedPlayer=-1){
+        const target=(mode===2)?DUEL_FINISH:TOTAL;
+        [0,1].forEach(i=>{
+          const el=document.getElementById(`runner${i+1}`);
+          if(!el)return;
+          const progress=Math.min(scores[i],target)/target;
+          const pct=6+progress*88;
+          el.style.left=`${pct}%`;
+          if(i===movedPlayer){el.classList.remove('bounce');void el.offsetWidth;el.classList.add('bounce')}
+        });
+      };
+
+      renderQuestion=function(){
+        baseRenderQuestion();
+        if(mode===2){
+          const roundEl=document.getElementById('round');
+          if(roundEl)roundEl.textContent=`Round ${duelRound} • First to ${DUEL_FINISH}`;
+          const bar=document.getElementById('bar');
+          if(bar)bar.style.width=`${Math.min(100,(Math.max(scores[0],scores[1])/DUEL_FINISH)*100)}%`;
+          const title=document.querySelector('.raceTitle');
+          if(title)title.textContent=`FIRST TO ${DUEL_FINISH} CORRECT ANSWERS WINS`;
+        }else{
+          const title=document.querySelector('.raceTitle');
+          if(title)title.textContent='CORRECT ANSWERS MOVE YOUR RUNNER';
+        }
+      };
+
+      restart=function(){duelRound=1;baseRestart()};
+
+      duelAnswer=function(pi,btn,op){
+        if(answered||pLocked[pi])return;
+        const q=questions[round];
+        if(op===q.answer){
+          answered=true;
+          scores[pi]++;
+          btn.classList.add('correct');
+          document.querySelectorAll('.panswer').forEach(x=>x.disabled=true);
+          document.getElementById('score1').textContent=`Player 1: ${scores[0]}`;
+          document.getElementById('score2').textContent=`Player 2: ${scores[1]}`;
+          updateRace(pi);
+          if(scores[pi]>=DUEL_FINISH){
+            feedback(`🏁 Player ${pi+1} reached the finishing line first!`,true);
+            document.getElementById('nextBtn').style.display='none';
+            setTimeout(()=>finish(),520);
+          }else{
+            feedback(`✅ Player ${pi+1} earns a point! ${q.explain}`,true);
+            document.getElementById('nextBtn').style.display='block';
+          }
+        }else{
+          pLocked[pi]=true;
+          btn.classList.add('wrong');
+          document.querySelectorAll(pi===0?'#p1answers .panswer':'#p2answers .panswer').forEach(x=>{x.disabled=true;x.classList.add('locked')});
+          feedback(`❌ Player ${pi+1} is locked out. Other player can answer!`,false);
+          if(pLocked[0]&&pLocked[1]){
+            answered=true;
+            document.querySelectorAll('.panswer').forEach(x=>{if(x.textContent.trim()===q.answer)x.classList.add('correct')});
+            feedback(`💡 No point this round. ${q.explain}`,false);
+            document.getElementById('nextBtn').style.display='block';
+          }
+        }
+      };
+
+      nextQuestion=function(){
+        if(mode!==2){round++;if(round>=TOTAL){finish();return}renderQuestion();return}
+        if(scores[0]>=DUEL_FINISH||scores[1]>=DUEL_FINISH){finish();return}
+        duelRound++;
+        round++;
+        if(round>=questions.length){questions=buildQuestions();round=0}
+        renderQuestion();
+      };
+
+      finish=function(){
+        if(mode!==2){baseFinish();return}
+        const winner=scores[0]>=DUEL_FINISH?1:2;
+        const bar=document.getElementById('bar');if(bar)bar.style.width='100%';
+        show('results');
+        document.getElementById('trophy').textContent='🏆';
+        document.getElementById('resultTitle').textContent=`Player ${winner} Wins the Race!`;
+        document.getElementById('resultText').innerHTML=`Player ${winner} reached the finishing line first!<br><br>Player 1: <b>${scores[0]}</b> point${scores[0]===1?'':'s'}<br>Player 2: <b>${scores[1]}</b> point${scores[1]===1?'':'s'}<br><br>Race again for a fresh mix of questions.`;
+      };
+
+      const note=document.querySelector('#home .intro .note');
+      if(note)note.textContent='1 Player: 12 questions. 2 Players: first to 6 correct answers reaches the finishing line and wins.';
+      const preview=document.querySelector('#home .preview p');
+      if(preview)preview.textContent='In 1-player mode, beat your own score. In 2-player mode, the first player to reach the finishing line wins.';
+      updateRace();
+    }catch(e){console.warn('Practice 1 race rules could not be installed',e)}
+  }
+  installPracticeOneRaceRules();
+
   function visible(el){if(!el)return false;const s=getComputedStyle(el),r=el.getBoundingClientRect();return s.display!=='none'&&s.visibility!=='hidden'&&r.width>0&&r.height>0}
   function resultElement(){
     const list=[...document.querySelectorAll('#results,.results,[id*="result" i],[class*="result" i],.screen.active')];
@@ -128,15 +227,10 @@
   function outcome(text,gm){const s=stateScores();let p1=s.a,p2=s.b,total=s.total;if(p1==null)p1=domScore('.score.p1,.p1.score,#score1,#p1Score');if(p2==null)p2=domScore('.score.p2,.p2.score,#score2,#p2Score');const f=[...text.matchAll(/(\d+)\s*\/\s*(\d+)/g)].map(m=>[+m[1],+m[2]]).filter(x=>x[1]>=5);if(f.length){p1=f[0][0];total=f[0][1]}const out=text.match(/(\d+)\s+out\s+of\s+(\d+)/i);if(out){p1=+out[1];total=+out[2]}let winner='p1';if(gm===2){winner=(p1!=null&&p2!=null)?(p1===p2?'tie':(p1>p2?'p1':'p2')):'tie'}return{winner,perfect:gm===1&&p1!=null&&total!=null&&total>0&&p1===total,p1,p2,total}}
   function twoPlayerFinalRound(res,text,o){
     if(o.p1==null||o.p2==null)return false;
-    if(o.total===12)return true;
-    const finalText=/final\s+score|final\s+results|game\s+complete|game\s+over|challenge\s+complete|12\s*(?:questions?|rounds?)|(?:question|round)\s*12\s*(?:of|\/)\s*12/i.test(text);
     const explicitFinal=!!(res&&res.matches&&res.matches('#results,.results'));
-    if(finalText||explicitFinal)return true;
-    try{if(typeof questions!=='undefined'&&questions&&questions.length===12)return true}catch(e){}
-    try{if(typeof qs!=='undefined'&&qs&&qs.length===12)return true}catch(e){}
-    try{if(typeof totalQuestions!=='undefined'&&Number(totalQuestions)===12)return true}catch(e){}
-    try{if(typeof TOTAL!=='undefined'&&Number(TOTAL)===12)return true}catch(e){}
-    return false;
+    if(explicitFinal)return true;
+    const finalText=/final\s+score|final\s+results|game\s+complete|game\s+over|challenge\s+complete|(?:question|round)\s*12\s*(?:of|\/)\s*12/i.test(text);
+    return finalText;
   }
 
   function update(gm,perfect,winner){
@@ -176,8 +270,13 @@
         if(duelGold&&card)card.classList.remove('preview');
         const sub=d.getElementById('mcSub'),msg=d.getElementById('mcMessage');
         if(duelGold){
-          if(sub)sub.textContent=`12-question round complete — Player 1: ${o.p1} • Player 2: ${o.p2}`;
-          if(msg)msg.textContent=`${winner==='p2'?'Player 2':'Player 1'} has the higher score and receives the GOLD MEDAL!`;
+          if(PRACTICE_ID===1){
+            if(sub)sub.textContent=`Race complete — Player 1: ${o.p1} • Player 2: ${o.p2}`;
+            if(msg)msg.textContent=`${winner==='p2'?'Player 2':'Player 1'} reached the finishing line first and receives the GOLD MEDAL!`;
+          }else{
+            if(sub)sub.textContent=`12-question round complete — Player 1: ${o.p1} • Player 2: ${o.p2}`;
+            if(msg)msg.textContent=`${winner==='p2'?'Player 2':'Player 1'} has the higher score and receives the GOLD MEDAL!`;
+          }
         }else if(!full&&sub)sub.textContent=`Practice ${PRACTICE_ID}: ${SPORT} completed!`;
         if(!duelGold&&!full&&msg){if(gm===1)msg.textContent=`Player 1 receives 1/11 of the medal! ${p.completed}/11 practices complete.`;else if(winner==='tie')msg.textContent="It's a tie — no gold medal is awarded."}
         const close=d.querySelector('#medalCeremony .mc-close');if(close)close.addEventListener('click',()=>setTimeout(()=>frame.remove(),0),{once:true});
