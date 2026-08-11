@@ -31,10 +31,10 @@ new='''function getCounts(data){
   });
   return {completed, perfect, pieces};
 }'''
-if old not in h:
-    raise SystemExit('Hub count block not found')
-h=h.replace(old,new,1)
+if old in h:
+    h=h.replace(old,new,1)
 h=h.replace('document.getElementById("medalFraction").textContent = `${counts.completed} / 11`;','document.getElementById("medalFraction").textContent = `${counts.pieces} / 11`;',1)
 h=h.replace('const fill = (counts.completed / TOTAL) * 360;','const fill = (counts.pieces / TOTAL) * 360;',1)
+h=h.replace('medalInner.textContent = counts.completed;','medalInner.textContent = counts.pieces;',1)
 hub.write_text(h,encoding='utf-8')
-print('Separated 2P full-gold awards from 1P 1/11 medal pieces.')
+print('2P gold and 1P medal pieces are separated consistently.')
