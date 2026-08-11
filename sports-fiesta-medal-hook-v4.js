@@ -139,10 +139,10 @@
     return false;
   }
 
-  function update(perfect,winner){
+  function update(gm,perfect,winner){
     let data={};try{data=JSON.parse(localStorage.getItem(HUB_KEY)||'{}')||{}}catch(e){}
     const old=data[PRACTICE_ID]||{};
-    data[PRACTICE_ID]={...old,completed:true,perfectSingle:!!old.perfectSingle||!!perfect,verified:true,source:'game-v5',updatedAt:new Date().toISOString(),lastWinner:winner};
+    data[PRACTICE_ID]={...old,completed:true,pieceEarned:!!old.pieceEarned||gm===1,perfectSingle:!!old.perfectSingle||!!perfect,verified:true,source:'game-v5',updatedAt:new Date().toISOString(),lastMode:gm,lastWinner:winner};
     localStorage.setItem(HUB_KEY,JSON.stringify(data));
     let completed=0,perfectCount=0;
     for(let i=1;i<=11;i++){
@@ -185,6 +185,6 @@
       }catch(e){frame.remove();}
     };
   }
-  function check(){clearTimeout(timer);timer=setTimeout(()=>{const res=resultElement();if(!res){shown=false;return}if(shown)return;const text=(res.innerText||'').replace(/\s+/g,' ').trim();if(text.length<20)return;const gm=readMode(text),o=outcome(text,gm);if(gm===2&&!twoPlayerFinalRound(res,text,o))return;const p=update(o.perfect,o.winner);shown=true;if(gm===2&&o.winner==='tie')return;setTimeout(()=>ceremony(gm,o,p),350)},120)}
+  function check(){clearTimeout(timer);timer=setTimeout(()=>{const res=resultElement();if(!res){shown=false;return}if(shown)return;const text=(res.innerText||'').replace(/\s+/g,' ').trim();if(text.length<20)return;const gm=readMode(text),o=outcome(text,gm);if(gm===2&&!twoPlayerFinalRound(res,text,o))return;const p=update(gm,o.perfect,o.winner);shown=true;if(gm===2&&o.winner==='tie')return;setTimeout(()=>ceremony(gm,o,p),350)},120)}
   new MutationObserver(check).observe(document.documentElement,{subtree:true,childList:true,attributes:true,attributeFilter:['class','style'],characterData:true});window.addEventListener('load',check);check();
 })();
