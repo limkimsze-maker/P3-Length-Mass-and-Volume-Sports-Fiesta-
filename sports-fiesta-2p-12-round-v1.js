@@ -6,6 +6,7 @@
   const title=document.title||'';
   const GOAL_RACE=/Swimming|Sailing Regatta|Triathlon|Torch Relay/i.test(title);
   const TORCH=/Torch Relay/i.test(title);
+  const usedQuestionKeys=new Set();
 
   function setTotal(m){
     try{ TOTAL = Number(m)===2 ? TWO_PLAYER_TOTAL : ONE_PLAYER_TOTAL; }catch(e){}
@@ -30,21 +31,109 @@
     return null;
   }
 
-  function ensureTwelve(){
+  function compactText(v){
+    return String(v).replace(/\s+/g,' ').trim();
+  }
+
+  function stableValue(v,depth){
+    if(depth>5||v==null)return '';
+    const t=typeof v;
+    if(t==='string'||t==='number'||t==='boolean')return `${t}:${compactText(v)}`;
+    if(t==='function')return '';
+    if(Array.isArray(v)){
+      return `[${v.map(x=>stableValue(x,depth+1)).filter(Boolean).sort().join('|')}]`;
+    }
+    if(t==='object'){
+      return `{${Object.keys(v).sort().map(k=>{
+        if(/^(options|ops|o)$/i.test(k))return '';
+        const x=stableValue(v[k],depth+1);
+        return x?`${k}:${x}`:'';
+      }).filter(Boolean).join('|')}}`;
+    }
+    return '';
+  }
+
+  function questionKey(q){
+    if(q==null)return '';
+    if(typeof q!=='object')return stableValue(q,0);
+    const important=['q','question','prompt','story','title','type','tag','v','picHTML','visual','answer','ans','a','correct','expected'];
+    const core={};
+    important.forEach(k=>{if(q[k]!==undefined)core[k]=q[k]});
+    return stableValue(core,0)||stableValue(q,0);
+  }
+
+  function resetUsedQuestions(){
+    usedQuestionKeys.clear();
+  }
+
+  function markCurrentQuestion(){
+    try{
+      const arr=getQuestionArray();
+      if(!arr||!arr.length)return;
+      const i=Math.max(0,Number(round)||0);
+      const q=arr[i];
+      const k=questionKey(q);
+      if(k)usedQuestionKeys.add(k);
+    }catch(e){}
+  }
+
+  function ensureUniqueRoundQuestions(required){
     const arr=getQuestionArray();
-    if(!arr||arr.length>=TWO_PLAYER_TOTAL)return;
+    if(!arr)return [];
+    const out=[];
+    const seen=new Set();
+    const add=q=>{
+      if(!q)return false;
+      const k=questionKey(q);
+      if(!k||seen.has(k))return false;
+      seen.add(k);
+      out.push(q);
+      return true;
+    };
+    arr.forEach(add);
+
     let guard=0;
-    while(arr.length<TWO_PLAYER_TOTAL&&guard++<4){
+    while(out.length<required&&guard++<80){
       const more=generateMore();
-      if(Array.isArray(more)&&more.length){
-        arr.push(...more.slice(0,TWO_PLAYER_TOTAL-arr.length));
-      }else break;
+      if(!Array.isArray(more)||!more.length)continue;
+      more.forEach(add);
     }
-    if(arr.length<TWO_PLAYER_TOTAL&&arr.length){
-      const base=arr.slice();
-      let i=0;
-      while(arr.length<TWO_PLAYER_TOTAL)arr.push(base[i++%base.length]);
+    setQuestionArray(out);
+    return out;
+  }
+
+  function prepareUnseenQuestion(index){
+    let arr=getQuestionArray();
+    if(!arr)arr=[];
+
+    const keyAt=i=>i>=0&&i<arr.length?questionKey(arr[i]):'';
+    const currentKey=keyAt(index);
+    if(currentKey&&!usedQuestionKeys.has(currentKey))return true;
+
+    for(let i=index+1;i<arr.length;i++){
+      const k=keyAt(i);
+      if(k&&!usedQuestionKeys.has(k)){
+        const tmp=arr[index];
+        arr[index]=arr[i];
+        arr[i]=tmp;
+        setQuestionArray(arr);
+        return true;
+      }
     }
+
+    let guard=0;
+    while(guard++<100){
+      const more=generateMore();
+      if(!Array.isArray(more)||!more.length)continue;
+      for(const q of more){
+        const k=questionKey(q);
+        if(!k||usedQuestionKeys.has(k))continue;
+        arr[index]=q;
+        setQuestionArray(arr);
+        return true;
+      }
+    }
+    return false;
   }
 
   function updateHomeCopy(){
@@ -70,10 +159,11 @@
     const old=window[name];
     if(typeof old!=='function'||old.__sf2p12)return false;
     const wrapped=function(m){
+      resetUsedQuestions();
       setTotal(m);
       const out=old.apply(this,arguments);
+      ensureUniqueRoundQuestions(Number(m)===2?TWO_PLAYER_TOTAL:ONE_PLAYER_TOTAL);
       if(Number(m)===2){
-        ensureTwelve();
         const r=document.getElementById('round');
         if(r&&!GOAL_RACE){
           const txt=r.textContent||'';
@@ -128,6 +218,7 @@
 
     window.renderQuestion=function(){
       const out=oldRender.apply(this,arguments);
+      markCurrentQuestion();
       try{
         if(mode===2){
           const r=document.getElementById('round');if(r)r.textContent=`Round ${duelRound} • First to ${target()}`;
@@ -138,11 +229,11 @@
     };
 
     window.restart=function(){
-      clearTimeout(finishTimer);finishTimer=null;finishing=false;duelRound=1;
+      clearTimeout(finishTimer);finishTimer=null;finishing=false;duelRound=1;resetUsedQuestions();
       return oldRestart.apply(this,arguments);
     };
 
-    if(typeof oldHome==='function')window.goHome=function(){clearTimeout(finishTimer);finishTimer=null;finishing=false;return oldHome.apply(this,arguments)};
+    if(typeof oldHome==='function')window.goHome=function(){clearTimeout(finishTimer);finishTimer=null;finishing=false;resetUsedQuestions();return oldHome.apply(this,arguments)};
 
     window.checkAnswer=function(){
       let p=0,before=-1;
@@ -157,16 +248,18 @@
         if(mode!==2){
           round++;
           if(round>=TOTAL){oldFinish();return}
+          if(!prepareUnseenQuestion(round)){
+            console.warn('Sports Fiesta could not generate another unique question.');
+            oldFinish();return;
+          }
           window.renderQuestion();return;
         }
         const w=winner();if(w>=0){endRace(w,0);return}
         duelRound++;
         round++;
-        let arr=getQuestionArray();
-        if(!arr||round>=arr.length){
-          const fresh=generateMore();
-          if(Array.isArray(fresh)&&fresh.length){setQuestionArray(fresh);arr=fresh}
-          round=0;
+        if(!prepareUnseenQuestion(round)){
+          console.warn('Sports Fiesta could not generate another unique question.');
+          return;
         }
         currentPlayer=currentPlayer===0?1:0;
         window.renderQuestion();
