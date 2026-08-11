@@ -1,0 +1,69 @@
+from pathlib import Path
+
+p=Path('sports-fiesta-medal-hook-v4.js')
+s=p.read_text(encoding='utf-8')
+
+old="let winner='p1';if(gm===2){if(/tie|draw|same score/i.test(text))winner='tie';else if(/player\\s*2[^.!]{0,35}(wins|won|winner)|\\bp2[^.!]{0,25}(wins|won|winner)/i.test(text))winner='p2';else if(/player\\s*1[^.!]{0,35}(wins|won|winner)|\\bp1[^.!]{0,25}(wins|won|winner)/i.test(text))winner='p1';else if(p1!=null&&p2!=null)winner=p1===p2?'tie':(p1>p2?'p1':'p2');else winner='tie'}return{winner,perfect:gm===1&&p1!=null&&total!=null&&total>0&&p1===total,p1,p2,total}}"
+new="let winner='p1';if(gm===2){winner=(p1!=null&&p2!=null)?(p1===p2?'tie':(p1>p2?'p1':'p2')):'tie'}return{winner,perfect:gm===1&&p1!=null&&total!=null&&total>0&&p1===total,p1,p2,total}}"
+if old not in s:
+    raise SystemExit('Winner block not found')
+s=s.replace(old,new,1)
+
+marker="  function update(perfect,winner){"
+helper="""  function twoPlayerFinalRound(res,text,o){
+    if(o.p1==null||o.p2==null)return false;
+    if(o.total===12)return true;
+    const finalText=/final\\s+score|final\\s+results|game\\s+complete|game\\s+over|challenge\\s+complete|12\\s*(?:questions?|rounds?)|(?:question|round)\\s*12\\s*(?:of|\\/)\\s*12/i.test(text);
+    const explicitFinal=!!(res&&res.matches&&res.matches('#results,.results'));
+    if(finalText||explicitFinal)return true;
+    try{if(typeof questions!=='undefined'&&questions&&questions.length===12)return true}catch(e){}
+    try{if(typeof qs!=='undefined'&&qs&&qs.length===12)return true}catch(e){}
+    try{if(typeof totalQuestions!=='undefined'&&Number(totalQuestions)===12)return true}catch(e){}
+    try{if(typeof TOTAL!=='undefined'&&Number(TOTAL)===12)return true}catch(e){}
+    return false;
+  }
+
+"""
+if 'function twoPlayerFinalRound' not in s:
+    if marker not in s:
+        raise SystemExit('Update marker not found')
+    s=s.replace(marker,helper+marker,1)
+
+old2="""  function ceremony(gm,o,p){
+    const full=o.perfect&&p.perfectCount===11;
+    const winner=gm===1?'p1':o.winner;
+    const kind=full?'gold':'piece';"""
+new2="""  function ceremony(gm,o,p){
+    const full=o.perfect&&p.perfectCount===11;
+    const duelGold=gm===2&&o.winner!=='tie';
+    const winner=gm===1?'p1':o.winner;
+    const kind=duelGold?'gold':(full?'gold':'piece');"""
+if old2 not in s:
+    raise SystemExit('Ceremony header not found')
+s=s.replace(old2,new2,1)
+
+old3="""        w.showMedalCeremony(false,winner,kind);
+        const sub=d.getElementById('mcSub'),msg=d.getElementById('mcMessage');
+        if(!full&&sub)sub.textContent=`Practice ${PRACTICE_ID}: ${SPORT} completed!`;
+        if(!full&&msg){if(gm===1)msg.textContent=`Player 1 receives 1/11 of the medal! ${p.completed}/11 practices complete.`;else if(winner==='p2')msg.textContent='Player 2 wins and receives 1/11 of the medal!';else if(winner==='tie')msg.textContent=\"It's a tie! Both players share the medal celebration!\";else msg.textContent='Player 1 wins and receives 1/11 of the medal!'}"""
+new3="""        w.showMedalCeremony(duelGold,winner,kind);
+        const card=d.querySelector('#medalCeremony .mc-card');
+        if(duelGold&&card)card.classList.remove('preview');
+        const sub=d.getElementById('mcSub'),msg=d.getElementById('mcMessage');
+        if(duelGold){
+          if(sub)sub.textContent=`12-question round complete — Player 1: ${o.p1} • Player 2: ${o.p2}`;
+          if(msg)msg.textContent=`${winner==='p2'?'Player 2':'Player 1'} has the higher score and receives the GOLD MEDAL!`;
+        }else if(!full&&sub)sub.textContent=`Practice ${PRACTICE_ID}: ${SPORT} completed!`;
+        if(!duelGold&&!full&&msg){if(gm===1)msg.textContent=`Player 1 receives 1/11 of the medal! ${p.completed}/11 practices complete.`;else if(winner==='tie')msg.textContent=\"It's a tie — no gold medal is awarded.\"}"""
+if old3 not in s:
+    raise SystemExit('Ceremony body not found')
+s=s.replace(old3,new3,1)
+
+old4="  function check(){clearTimeout(timer);timer=setTimeout(()=>{const res=resultElement();if(!res){shown=false;return}if(shown)return;const text=(res.innerText||'').replace(/\\s+/g,' ').trim();if(text.length<20)return;const gm=readMode(text),o=outcome(text,gm),p=update(o.perfect,o.winner);shown=true;setTimeout(()=>ceremony(gm,o,p),350)},120)}"
+new4="  function check(){clearTimeout(timer);timer=setTimeout(()=>{const res=resultElement();if(!res){shown=false;return}if(shown)return;const text=(res.innerText||'').replace(/\\s+/g,' ').trim();if(text.length<20)return;const gm=readMode(text),o=outcome(text,gm);if(gm===2&&!twoPlayerFinalRound(res,text,o))return;const p=update(o.perfect,o.winner);shown=true;if(gm===2&&o.winner==='tie')return;setTimeout(()=>ceremony(gm,o,p),350)},120)}"
+if old4 not in s:
+    raise SystemExit('Check block not found')
+s=s.replace(old4,new4,1)
+
+p.write_text(s,encoding='utf-8')
+print('Updated 2-player rule: final-score winner only; full gold medal; ties receive no medal.')
