@@ -171,7 +171,7 @@
         const cover=d.getElementById('fiestaCover');if(cover)cover.style.display='none';
         const app=d.querySelector('.app');if(app)app.style.setProperty('display','none','important');
         d.body.style.padding='0';d.body.style.overflow='hidden';
-        w.showMedalCeremony(duelGold,winner,kind);
+        w.showMedalCeremony(false,winner,kind);
         const card=d.querySelector('#medalCeremony .mc-card');
         if(duelGold&&card)card.classList.remove('preview');
         const sub=d.getElementById('mcSub'),msg=d.getElementById('mcMessage');
