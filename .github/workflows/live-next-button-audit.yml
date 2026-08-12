@@ -11,7 +11,7 @@ jobs:
     steps:
       - name: Install Selenium
         run: python -m pip install --disable-pip-version-check selenium
-      - name: Test all 11 published practices
+      - name: Test all practices, modes and levels
         run: |
           python - <<'PY'
           import time, urllib.request, sys
@@ -19,17 +19,17 @@ jobs:
           from selenium.webdriver.chrome.options import Options
 
           pages=[
-            ('P1','https://limkimsze-maker.github.io/P3-1-Recall-of-Length-/'),
-            ('P2','https://limkimsze-maker.github.io/P3-2.-Length-Conversion/'),
-            ('P3','https://limkimsze-maker.github.io/P3-3-Recall-of-Mass/'),
-            ('P4','https://limkimsze-maker.github.io/P3-4-Mass-Reading/'),
-            ('P5','https://limkimsze-maker.github.io/P3-5-Mass-Conversion/'),
-            ('P6','https://limkimsze-maker.github.io/P3-6-Recall-Volume/'),
-            ('P7','https://limkimsze-maker.github.io/P3-7-Reading-of-Volume/'),
-            ('P8','https://limkimsze-maker.github.io/P3-8-measuring-volumes-in-litres-and-millimetres/'),
-            ('P9','https://limkimsze-maker.github.io/P3-9-measuring-volumes-in-litres-and-mililitres/'),
-            ('P10','https://limkimsze-maker.github.io/P3-10-Recall-Word-Problems/'),
-            ('P11','https://limkimsze-maker.github.io/P3-11-Length-Mass-and-Volume-Word-Problems/'),
+            ('P1','https://limkimsze-maker.github.io/P3-1-Recall-of-Length-/',[None]),
+            ('P2','https://limkimsze-maker.github.io/P3-2.-Length-Conversion/',['easy','intermediate','hard']),
+            ('P3','https://limkimsze-maker.github.io/P3-3-Recall-of-Mass/',[None]),
+            ('P4','https://limkimsze-maker.github.io/P3-4-Mass-Reading/',[None]),
+            ('P5','https://limkimsze-maker.github.io/P3-5-Mass-Conversion/',['easy','intermediate','hard']),
+            ('P6','https://limkimsze-maker.github.io/P3-6-Recall-Volume/',[None]),
+            ('P7','https://limkimsze-maker.github.io/P3-7-Reading-of-Volume/',['easy','intermediate','hard']),
+            ('P8','https://limkimsze-maker.github.io/P3-8-measuring-volumes-in-litres-and-millimetres/',['easy','intermediate']),
+            ('P9','https://limkimsze-maker.github.io/P3-9-measuring-volumes-in-litres-and-mililitres/',['easy','intermediate']),
+            ('P10','https://limkimsze-maker.github.io/P3-10-Recall-Word-Problems/',[None]),
+            ('P11','https://limkimsze-maker.github.io/P3-11-Length-Mass-and-Volume-Word-Problems/',[None]),
           ]
 
           guard_url='https://limkimsze-maker.github.io/P3-Length-Mass-and-Volume-Sports-Fiesta-/sports-fiesta-next-guard-v1.js'
@@ -41,7 +41,7 @@ jobs:
             time.sleep(4)
           else: raise SystemExit('Shared Next guard is not live yet')
 
-          for name,url in pages:
+          for name,url,_ in pages:
             ok=False
             for attempt in range(30):
               try:
@@ -59,43 +59,62 @@ jobs:
           opts.add_argument('--window-size=1440,1000')
           driver=webdriver.Chrome(options=opts)
           failures=[]
+          passes=0
           try:
-            for name,url in pages:
-              try:
-                driver.get(url+'?audit='+str(time.time()))
-                time.sleep(1.2)
-                started=driver.execute_script('''
-                  try{
-                    if(typeof window.startGame==='function'){window.startGame(1);return 'startGame';}
-                    if(typeof window.start==='function'){window.start(1);return 'start';}
-                    const b=[...document.querySelectorAll('button')].find(x=>/1\s*Player/i.test(x.textContent||''));
-                    if(b){b.click();return 'button';}
-                    return '';
-                  }catch(e){return 'ERR:'+e.message}
-                ''')
-                if not started or str(started).startswith('ERR:'):
-                  raise RuntimeError('could not start game: '+str(started))
-                time.sleep(.6)
-                before=driver.execute_script("return (document.getElementById('round')||document.querySelector('.round'))?.textContent?.trim()||''")
-                found=driver.execute_script('''
-                  const b=document.getElementById('nextBtn')||document.getElementById('next')||[...document.querySelectorAll('button')].find(x=>/^\s*Next\b/i.test(x.textContent||''));
-                  if(!b)return false;
-                  b.classList.remove('hidden');b.style.display='block';b.disabled=false;b.removeAttribute('disabled');
-                  b.click();return true;
-                ''')
-                if not found: raise RuntimeError('Next button not found')
-                time.sleep(.8)
-                after=driver.execute_script("return (document.getElementById('round')||document.querySelector('.round'))?.textContent?.trim()||''")
-                results=driver.execute_script("const r=document.getElementById('results');return !!(r&&r.classList.contains('active'))")
-                if before==after and not results:
-                  raise RuntimeError(f'round did not advance ({before!r} -> {after!r})')
-                print(f'{name}: PASS {before!r} -> {after!r}')
-              except Exception as e:
-                failures.append(f'{name}: {e}')
-                print(f'{name}: FAIL {e}',file=sys.stderr)
+            for name,url,levels in pages:
+              for level in levels:
+                for mode in (1,2):
+                  label=f'{name} {level or "standard"} {mode}P'
+                  try:
+                    driver.get(url+'?audit='+str(time.time()))
+                    time.sleep(.9)
+                    if level:
+                      result=driver.execute_script('''
+                        const lev=arguments[0];
+                        try{
+                          if(typeof window.setDifficulty==='function'){window.setDifficulty(lev);return 'setDifficulty';}
+                          const b=document.getElementById('diff'+lev.charAt(0).toUpperCase()+lev.slice(1))||[...document.querySelectorAll('button')].find(x=>(x.textContent||'').trim().toLowerCase()===lev);
+                          if(b){b.click();return 'button';}
+                          return '';
+                        }catch(e){return 'ERR:'+e.message}
+                      ''',level)
+                      if not result or str(result).startswith('ERR:'):
+                        raise RuntimeError('could not set difficulty: '+str(result))
+                    started=driver.execute_script('''
+                      const m=arguments[0];
+                      try{
+                        if(typeof window.startGame==='function'){window.startGame(m);return 'startGame';}
+                        if(typeof window.start==='function'){window.start(m);return 'start';}
+                        const rx=m===1?/1\s*Player/i:/2\s*Players?/i;
+                        const b=[...document.querySelectorAll('button')].find(x=>rx.test(x.textContent||''));
+                        if(b){b.click();return 'button';}
+                        return '';
+                      }catch(e){return 'ERR:'+e.message}
+                    ''',mode)
+                    if not started or str(started).startswith('ERR:'):
+                      raise RuntimeError('could not start game: '+str(started))
+                    time.sleep(.45)
+                    before=driver.execute_script("return (document.getElementById('round')||document.querySelector('.round'))?.textContent?.trim()||''")
+                    found=driver.execute_script('''
+                      const b=document.getElementById('nextBtn')||document.getElementById('next')||[...document.querySelectorAll('button')].find(x=>/^\s*Next\b/i.test(x.textContent||''));
+                      if(!b)return false;
+                      b.classList.remove('hidden');b.style.display='block';b.disabled=false;b.removeAttribute('disabled');
+                      b.click();return true;
+                    ''')
+                    if not found: raise RuntimeError('Next button not found')
+                    time.sleep(.55)
+                    after=driver.execute_script("return (document.getElementById('round')||document.querySelector('.round'))?.textContent?.trim()||''")
+                    results=driver.execute_script("const r=document.getElementById('results');return !!(r&&r.classList.contains('active'))")
+                    if before==after and not results:
+                      raise RuntimeError(f'round did not advance ({before!r} -> {after!r})')
+                    passes+=1
+                    print(f'{label}: PASS {before!r} -> {after!r}')
+                  except Exception as e:
+                    failures.append(f'{label}: {e}')
+                    print(f'{label}: FAIL {e}',file=sys.stderr)
           finally:
             driver.quit()
           if failures:
             raise SystemExit('\n'.join(failures))
-          print('ALL 11 LIVE NEXT-BUTTON TESTS PASSED')
+          print(f'ALL {passes} LIVE NEXT-BUTTON SCENARIOS PASSED')
           PY
