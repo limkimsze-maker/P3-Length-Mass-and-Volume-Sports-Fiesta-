@@ -1,0 +1,112 @@
+name: Live Real Next Audit v2
+on:
+  push:
+    paths:
+      - '.github/workflows/live-real-next-audit-v2.yml'
+permissions:
+  contents: read
+jobs:
+  exact-real-flow:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Selenium
+        run: python -m pip install --disable-pip-version-check selenium
+      - name: Test exact answer then Next for every practice mode and level
+        run: |
+          python - <<'PY'
+          import time, traceback, json
+          from selenium import webdriver
+          from selenium.webdriver.chrome.options import Options
+          from selenium.webdriver.support.ui import WebDriverWait
+
+          base='https://limkimsze-maker.github.io/'
+          cases=[]
+          def add(p,path,levels):
+            for level in levels:
+              for mode in (1,2):
+                cases.append((p,path,level,mode))
+          add(1,'P3-1-Recall-of-Length-/',[None])
+          add(2,'P3-2.-Length-Conversion/',['easy','intermediate','hard'])
+          add(3,'P3-3-Recall-of-Mass/',[None])
+          add(4,'P3-4-Mass-Reading/',[None])
+          add(5,'P3-5-Mass-Conversion/',['easy','intermediate','hard'])
+          add(6,'P3-6-Recall-Volume/',[None])
+          add(7,'P3-7-Reading-of-Volume/',['easy','intermediate','hard'])
+          add(8,'P3-8-measuring-volumes-in-litres-and-millimetres/',['easy','intermediate'])
+          add(9,'P3-9-measuring-volumes-in-litres-and-mililitres/',['easy','intermediate'])
+          add(10,'P3-10-Recall-Word-Problems/',[None])
+          add(11,'P3-11-Length-Mass-and-Volume-Word-Problems/',[None])
+
+          opts=Options();opts.add_argument('--headless=new');opts.add_argument('--no-sandbox');opts.add_argument('--disable-dev-shm-usage');opts.add_argument('--window-size=1440,1000');opts.add_argument('--autoplay-policy=no-user-gesture-required')
+          d=webdriver.Chrome(options=opts)
+          results=[]
+
+          solve_js=r'''
+          const p=arguments[0], mode=arguments[1];
+          const setv=(el,v)=>{el.value=String(v);el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));};
+          const norm=x=>String(x??'').replace(/\s+/g,' ').trim();
+          const clickExact=(nodes,target)=>{const b=[...nodes].find(x=>norm(x.textContent)===norm(target));if(!b)throw new Error('correct option not found: '+target);b.click();};
+          if(p===1){
+            const q=questions[round];
+            const sel=mode===2?'#p1answers .panswer':'#soloAnswers .answer';
+            clickExact(document.querySelectorAll(sel),q.answer); return 'P1 option '+q.answer;
+          }
+          if(p===2){
+            const q=currentQuestion;
+            if(q.mode==='choice'){clickExact(document.querySelectorAll('.choiceBtn'),q.correct);return 'P2 choice '+q.correct;}
+            q.fields.forEach(id=>setv(document.getElementById(id),q.expected[id]));
+            document.getElementById('checkBtn').click(); return 'P2 inputs';
+          }
+          if(p===3){const q=qs[idx];clickExact(document.querySelectorAll('.ans'),q.a);return 'P3 option '+q.a;}
+          if(p===4){const q=questions[round],t=q.totalGrams;setv(document.getElementById('kgInput'),Math.floor(t/1000));setv(document.getElementById('gInput'),t%1000);document.getElementById('checkBtn').click();return 'P4 '+t+'g';}
+          if(p===5){const q=questions[round],ins=inputs();if(ins.length!==q.answers.length)throw new Error('P5 input/answer length mismatch '+ins.length+'/'+q.answers.length);ins.forEach((el,i)=>setv(el,q.answers[i]));document.getElementById('checkBtn').click();return 'P5 inputs';}
+          if(p===6||p===7){const q=questions[round];setv(document.getElementById('answerInput'),q.answer);document.getElementById('checkBtn').click();return 'P'+p+' answer '+q.answer;}
+          if(p===8){const q=questions[round],t=q.totalMl;setv(document.getElementById('litreInput'),Math.floor(t/1000));setv(document.getElementById('mlInput'),t%1000);document.getElementById('checkBtn').click();return 'P8 '+t+'ml';}
+          if(p===9||p===10||p===11){const q=questions[round];q.fields.forEach(id=>setv(document.getElementById(id),q.expected[id]));document.getElementById('checkBtn').click();return 'P'+p+' fields';}
+          throw new Error('Unknown practice '+p);
+          '''
+
+          try:
+            for p,path,level,mode in cases:
+              label=f'P{p} {level or "standard"} {mode}P'
+              try:
+                d.get(base+path+'?exactaudit='+str(time.time()))
+                time.sleep(1.0)
+                if level:
+                  ok=d.execute_script("if(typeof setDifficulty==='function'){setDifficulty(arguments[0]);return true}return false",level)
+                  if not ok: raise RuntimeError('difficulty setter missing')
+                started=d.execute_script("if(typeof startGame==='function'){startGame(arguments[0]);return 'startGame'}if(typeof start==='function'){start(arguments[0]);return 'start'}return ''",mode)
+                if not started: raise RuntimeError('start function missing')
+                time.sleep(.55)
+                for step in range(2):
+                  round_el=d.execute_script("return document.getElementById('round')||document.querySelector('.round')")
+                  if not round_el: raise RuntimeError('round display missing')
+                  before=d.execute_script("return (document.getElementById('round')||document.querySelector('.round')).textContent.trim()")
+                  how=d.execute_script(solve_js,p,mode)
+                  def next_ready(_):
+                    return d.execute_script("const b=document.getElementById('nextBtn')||document.getElementById('next');if(!b)return false;const s=getComputedStyle(b);return s.display!=='none'&&s.visibility!=='hidden'&&!b.disabled")
+                  WebDriverWait(d,15).until(next_ready)
+                  feedback=d.execute_script("const f=document.getElementById('feedback')||document.getElementById('fb');return f?f.textContent.trim():''")
+                  if feedback and not any(x in feedback for x in ['Correct','correct','wins the point','STRIKE']):
+                    raise RuntimeError('correct-answer feedback unexpected: '+feedback)
+                  d.execute_script("(document.getElementById('nextBtn')||document.getElementById('next')).click()")
+                  def advanced(_):
+                    return d.execute_script("const r=document.getElementById('results');const now=(document.getElementById('round')||document.querySelector('.round'))?.textContent?.trim()||'';return !!(r&&r.classList.contains('active'))||now!==arguments[0]",before)
+                  WebDriverWait(d,8).until(advanced)
+                  after=d.execute_script("return (document.getElementById('round')||document.querySelector('.round'))?.textContent?.trim()||'RESULTS'")
+                  results.append({'case':label,'step':step+1,'status':'PASS','from':before,'to':after,'solve':how})
+                print(label,'PASS')
+              except Exception as e:
+                results.append({'case':label,'status':'FAIL','error':repr(e)})
+                print(label,'FAIL',repr(e))
+          finally:
+            d.quit()
+
+          print('\n=== EXACT REAL-FLOW RESULTS ===')
+          for r in results: print(json.dumps(r,ensure_ascii=False))
+          failed=[r for r in results if r['status']=='FAIL']
+          print(f'CASES={len(cases)} FAILURES={len(failed)}')
+          if failed:
+            raise SystemExit('Failed cases: '+', '.join(r['case'] for r in failed))
+          print('ALL 38 EXACT REAL-ANSWER NEXT SCENARIOS PASSED')
+          PY
