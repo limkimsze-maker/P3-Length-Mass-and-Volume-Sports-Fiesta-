@@ -1,0 +1,91 @@
+name: Live Real Next Diagnostics
+on:
+  push:
+    paths:
+      - '.github/workflows/live-real-next-diagnostics.yml'
+permissions:
+  contents: read
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {p: 1, path: 'P3-1-Recall-of-Length-', level: none}
+          - {p: 4, path: 'P3-4-Mass-Reading', level: none}
+          - {p: 5, path: 'P3-5-Mass-Conversion', level: intermediate}
+          - {p: 6, path: 'P3-6-Recall-Volume', level: none}
+          - {p: 7, path: 'P3-7-Reading-of-Volume', level: easy}
+          - {p: 8, path: 'P3-8-measuring-volumes-in-litres-and-millimetres', level: easy}
+          - {p: 9, path: 'P3-9-measuring-volumes-in-litres-and-mililitres', level: easy}
+          - {p: 10, path: 'P3-10-Recall-Word-Problems', level: none}
+          - {p: 11, path: 'P3-11-Length-Mass-and-Volume-Word-Problems', level: none}
+    name: P${{ matrix.p }} diagnostic
+    steps:
+      - run: python -m pip install --disable-pip-version-check selenium
+      - name: Capture exact flow
+        env:
+          P: ${{ matrix.p }}
+          PATH_PART: ${{ matrix.path }}
+          LEVEL: ${{ matrix.level }}
+        run: |
+          python - <<'PY'
+          import os,time,json,traceback
+          from selenium import webdriver
+          from selenium.webdriver.chrome.options import Options
+          p=int(os.environ['P']); path=os.environ['PATH_PART']; level=os.environ['LEVEL']; url='https://limkimsze-maker.github.io/'+path+'/'
+          log=[]; failed=False
+          o=Options();o.add_argument('--headless=new');o.add_argument('--no-sandbox');o.add_argument('--disable-dev-shm-usage');o.add_argument('--window-size=1440,1000');o.set_capability('goog:loggingPrefs',{'browser':'ALL'})
+          d=webdriver.Chrome(options=o)
+          setv="""const e=document.getElementById(arguments[0]);if(!e)throw new Error('missing '+arguments[0]);e.value=String(arguments[1]);e.dispatchEvent(new Event('input',{bubbles:true}));e.dispatchEvent(new Event('change',{bubbles:true}));"""
+          try:
+            d.get(url+'?diag='+str(time.time()));time.sleep(1.4)
+            if level!='none': d.execute_script("if(typeof setDifficulty==='function')setDifficulty(arguments[0])",level)
+            started=d.execute_script("if(typeof startGame==='function'){startGame(1);return 'startGame'}if(typeof start==='function'){start(1);return 'start'}return ''")
+            log.append('started='+repr(started));time.sleep(.8)
+            before=d.execute_script("return (document.getElementById('round')||document.querySelector('.round'))?.textContent?.trim()||''")
+            log.append('before='+repr(before))
+            qinfo=d.execute_script("""try{let q=null;if(typeof currentQuestion!=='undefined'&&currentQuestion)q=currentQuestion;else if(typeof questions!=='undefined'&&Array.isArray(questions))q=questions[typeof round!=='undefined'?round:0];else if(typeof qs!=='undefined'&&Array.isArray(qs))q=qs[typeof idx!=='undefined'?idx:0];return JSON.stringify(q,(k,v)=>typeof v==='function'?'[Function]':v)}catch(e){return 'QERR '+e.message}""")
+            log.append('q='+str(qinfo)[:5000])
+            if p==1:
+              ans=d.execute_script("return questions[round].answer");log.append('answer='+repr(ans));d.execute_script("const a=arguments[0],b=[...document.querySelectorAll('#soloAnswers .answer')].find(x=>x.textContent.trim()===String(a).trim());if(!b)throw new Error('option missing '+a);b.click()",ans)
+            elif p==4:
+              t=d.execute_script("return questions[round].totalGrams");d.execute_script(setv,'kgInput',t//1000);d.execute_script(setv,'gInput',t%1000);d.find_element('id','checkBtn').click()
+            elif p==5:
+              vals=d.execute_script("return questions[round].answers");log.append('answers='+repr(vals));n=d.execute_script("return inputs().length");log.append('inputCount='+str(n));
+              for i,v in enumerate(vals): d.execute_script("const a=inputs();a[arguments[0]].value=String(arguments[1]);a[arguments[0]].dispatchEvent(new Event('input',{bubbles:true}))",i,v)
+              d.find_element('id','checkBtn').click()
+            elif p in (6,7):
+              a=d.execute_script("return questions[round].answer");log.append('answer='+repr(a));d.execute_script(setv,'answerInput',a);d.find_element('id','checkBtn').click()
+            elif p==8:
+              t=d.execute_script("return questions[round].totalMl");log.append('totalMl='+repr(t));d.execute_script(setv,'litreInput',t//1000);d.execute_script(setv,'mlInput',t%1000);d.find_element('id','checkBtn').click()
+            elif p in (9,10,11):
+              data=d.execute_script("return {fields:questions[round].fields,expected:questions[round].expected}");log.append('data='+repr(data))
+              for fid in data['fields']: d.execute_script(setv,fid,data['expected'][fid])
+              d.find_element('id','checkBtn').click()
+            time.sleep(1.8)
+            state=d.execute_script("""const b=document.getElementById('nextBtn')||document.getElementById('next'),f=document.getElementById('feedback')||document.getElementById('fb');return {feedback:f?f.textContent.trim():'',nextExists:!!b,nextClass:b?b.className:'',nextDisabled:b?b.disabled:null,nextDisplay:b?getComputedStyle(b).display:'',nextVisibility:b?getComputedStyle(b).visibility:''}""")
+            log.append('afterCheck='+repr(state))
+            if not state['nextExists']: raise RuntimeError('Next missing')
+            if state['nextDisplay']=='none' or state['nextVisibility']=='hidden' or state['nextDisabled']: raise RuntimeError('Next not ready after correct answer')
+            d.execute_script("(document.getElementById('nextBtn')||document.getElementById('next')).click()");time.sleep(1.0)
+            after=d.execute_script("return (document.getElementById('round')||document.querySelector('.round'))?.textContent?.trim()||''")
+            log.append('after='+repr(after))
+            if before==after: raise RuntimeError('Next click did not advance round')
+            log.append('PASS')
+          except Exception as e:
+            failed=True;log.append('FAIL '+repr(e));log.append(traceback.format_exc())
+          try:
+            log.append('browserLogs='+json.dumps(d.get_log('browser'),ensure_ascii=False)[-12000:])
+          except Exception as e: log.append('browserLogErr='+repr(e))
+          d.quit()
+          open('diagnostic.txt','w').write('\n'.join(log)+'\n')
+          open('failed.flag','w').write('1' if failed else '0')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: next-diagnostic-P${{ matrix.p }}
+          path: diagnostic.txt
+      - name: Enforce
+        run: test "$(cat failed.flag)" = 0
