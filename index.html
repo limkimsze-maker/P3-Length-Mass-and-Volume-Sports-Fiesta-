@@ -844,7 +844,7 @@ renderAll();
     const originals=document.querySelectorAll('.playerImgWrap img.playerSvg');
     if(originals.length>=2){document.getElementById('fcP1').src=originals[0].src;document.getElementById('fcP2').src=originals[1].src;}
     const btn=document.getElementById('fcStart');
-    if(btn)btn.addEventListener('click',function(){document.body.classList.remove('cover-on');document.getElementById('fiestaCover').style.display='none';window.scrollTo(0,0);});
+    if(btn)btn.addEventListener('click',function(){try{const a=new Audio('sports_fiesta_kindergarten_v2.mp3?v=20260812a');a.volume=1;a.play().catch(()=>{});}catch(e){}document.body.classList.remove('cover-on');document.getElementById('fiestaCover').style.display='none';window.scrollTo(0,0);});
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',setupCover);else setupCover();
 })();
