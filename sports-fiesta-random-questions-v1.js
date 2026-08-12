@@ -86,8 +86,8 @@
   if (id === 1 && typeof unitObjects !== 'undefined' && typeof buildQuestions === 'function') {
     const extras = [
       {name:'exercise book',type:'book',value:29,unit:'cm',dimension:'length'},
-      {name:'school shoe',type:'shoe',value:24,unit:'cm',dimension:'length'},
-      {name:'lunch box',type:'box',value:20,unit:'cm',dimension:'length'},
+      {name:'magazine',type:'book',value:27,unit:'cm',dimension:'length'},
+      {name:'marker pen',type:'pen',value:14,unit:'cm',dimension:'length'},
       {name:'classroom whiteboard',type:'table',value:2,unit:'m',dimension:'length'},
       {name:'playground bench',type:'table',value:2,unit:'m',dimension:'length'},
       {name:'young tree',type:'tree',value:3,unit:'m',dimension:'height'},
@@ -100,8 +100,8 @@
     const estimatePool = [
       {name:'sports bottle',type:'bottle',measure:'Height ?',ans:'24 cm',ops:['24 cm','24 m','240 m','2 m']},
       {name:'exercise book',type:'book',measure:'Length ?',ans:'29 cm',ops:['29 cm','29 m','290 m','3 m']},
-      {name:'school shoe',type:'shoe',measure:'Length ?',ans:'24 cm',ops:['24 cm','24 m','240 m','2 m']},
-      {name:'lunch box',type:'box',measure:'Length ?',ans:'20 cm',ops:['20 cm','20 m','200 m','2 m']},
+      {name:'magazine',type:'book',measure:'Length ?',ans:'27 cm',ops:['27 cm','27 m','270 m','3 m']},
+      {name:'marker pen',type:'pen',measure:'Length ?',ans:'14 cm',ops:['14 cm','14 m','140 m','1 m']},
       {name:'classroom doorway',type:'door',measure:'Height ?',ans:'2 m',ops:['2 m','2 cm','20 cm','20 m']},
       {name:'single bed',type:'bed',measure:'Length ?',ans:'2 m',ops:['2 m','2 cm','20 cm','20 m']},
       {name:'study table',type:'table',measure:'Length ?',ans:'1 m',ops:['1 m','1 cm','10 m','100 m']},
