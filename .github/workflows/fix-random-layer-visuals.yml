@@ -16,13 +16,8 @@ jobs:
           from pathlib import Path
           p=Path('sports-fiesta-random-questions-v1.js')
           s=p.read_text()
-          old="""        if (typeof v === 'function') return undefined;
-        if (k === 'render') return undefined;
-        return v;"""
-          new="""        if (typeof v === 'function') return undefined;
-        if (k === 'render') return undefined;
-        if ((k === 'options' || k === 'o') && Array.isArray(v)) return [...v].map(String).sort();
-        return v;"""
+          old="        if (k === 'render') return undefined;\n        return v;"
+          new="        if (k === 'render') return undefined;\n        if ((k === 'options' || k === 'o') && Array.isArray(v)) return [...v].map(String).sort();\n        return v;"
           if old in s:
               s=s.replace(old,new,1)
           p.write_text(s)
