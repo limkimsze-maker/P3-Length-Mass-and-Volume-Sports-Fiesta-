@@ -40,62 +40,42 @@ jobs:
             10:['buildQuestions','checkAnswer','finish'],
             11:['buildQuestions','checkAnswer','finish']
           }
-          errors=[]
-          htmls={}
+          errors=[]; htmls={}
           tmp=pathlib.Path('/tmp/sports-fiesta-audit'); tmp.mkdir(exist_ok=True)
-
           for pid,repo in repos.items():
             url=f'https://raw.githubusercontent.com/limkimsze-maker/{repo}/main/index.html'
-            try:
-              html=urllib.request.urlopen(url,timeout=30).read().decode()
-            except Exception as e:
-              errors.append(f'P{pid}: could not fetch index.html: {e}'); continue
+            try: html=urllib.request.urlopen(url,timeout=30).read().decode()
+            except Exception as e: errors.append(f'P{pid}: could not fetch index.html: {e}'); continue
             htmls[pid]=html
             for fn in required[pid]:
-              if not re.search(rf'function\s+{re.escape(fn)}\s*\(',html):
-                errors.append(f'P{pid}: missing required function {fn}()')
-            if 'sports-fiesta-back-to-hub-v1.js?v=20260812a' not in html:
-              errors.append(f'P{pid}: Back to Fiesta Hub button script not loaded')
-
+              if not re.search(rf'function\s+{re.escape(fn)}\s*\(',html): errors.append(f'P{pid}: missing required function {fn}()')
+            if 'sports-fiesta-back-to-hub-v1.js?v=20260812a' not in html: errors.append(f'P{pid}: Back to Fiesta Hub button script not loaded')
             inline=re.findall(r'<script(?![^>]*\bsrc=)[^>]*>(.*?)</script>',html,re.S|re.I)
             for n,js in enumerate(inline,1):
               f=tmp/f'p{pid}-inline-{n}.js'; f.write_text(js)
               r=subprocess.run(['node','--check',str(f)],capture_output=True,text=True)
-              if r.returncode:
-                errors.append(f'P{pid}: inline script {n} syntax error: {r.stderr.strip()}')
-
+              if r.returncode: errors.append(f'P{pid}: inline script {n} syntax error: {r.stderr.strip()}')
           shared=['sports-fiesta-original-questions-v1.js','sports-fiesta-random-questions-v1.js','sports-fiesta-medal-hook-v4.js','sports-fiesta-2p-12-round-v2.js','sports-fiesta-audit-fixes-v1.js','sports-fiesta-back-to-hub-v1.js']
           for name in shared:
             url=f'https://raw.githubusercontent.com/limkimsze-maker/P3-Length-Mass-and-Volume-Sports-Fiesta-/main/{name}'
             try: js=urllib.request.urlopen(url,timeout=30).read().decode()
-            except Exception as e:
-              errors.append(f'{name}: could not fetch: {e}'); continue
-            f=tmp/name; f.write_text(js)
-            r=subprocess.run(['node','--check',str(f)],capture_output=True,text=True)
+            except Exception as e: errors.append(f'{name}: could not fetch: {e}'); continue
+            f=tmp/name; f.write_text(js); r=subprocess.run(['node','--check',str(f)],capture_output=True,text=True)
             if r.returncode: errors.append(f'{name}: syntax error: {r.stderr.strip()}')
-
           for pid in [4,5,6,9,10,11]:
             h=htmls.get(pid,'')
-            if 'sports-fiesta-2p-12-round-v2.js?v=20260812b' not in h:
-              errors.append(f'P{pid}: fair 2P v2 layer not loaded')
-            if 'sports-fiesta-2p-12-round-v1.js' in h:
-              errors.append(f'P{pid}: obsolete unfair 2P v1 layer still loaded')
-
-          if 'sports-fiesta-audit-fixes-v1.js' not in htmls.get(1,''):
-            errors.append('P1: long-match uniqueness audit layer missing')
-          if 'sports-fiesta-audit-fixes-v1.js' not in htmls.get(11,''):
-            errors.append('P11: route-range audit layer missing')
-          if '.sort((a,b)=>Number(a.dataset.i)-Number(b.dataset.i))' not in htmls.get(5,''):
-            errors.append('P5: deterministic answer-box ordering fix missing')
-          if 'const kinds=TOTAL===12?' not in htmls.get(6,''):
-            errors.append('P6: balanced 12-question type plan missing')
-          if 'const vals=[1,2,3,4,5,6,7,8,9]' not in htmls.get(7,''):
-            errors.append('P7: whole-number syringe range safeguard missing')
-          if 'commutativePairs' not in htmls.get(11,''):
-            errors.append('P11: commutative-operation checker safeguard missing')
-
+            if 'sports-fiesta-2p-12-round-v2.js?v=20260812b' not in h: errors.append(f'P{pid}: fair 2P v2 layer not loaded')
+            if 'sports-fiesta-2p-12-round-v1.js' in h: errors.append(f'P{pid}: obsolete unfair 2P v1 layer still loaded')
+          if 'sports-fiesta-audit-fixes-v1.js' not in htmls.get(1,''): errors.append('P1: long-match uniqueness audit layer missing')
+          if 'sports-fiesta-audit-fixes-v1.js' not in htmls.get(11,''): errors.append('P11: route-range audit layer missing')
+          if '.sort((a,b)=>Number(a.dataset.i)-Number(b.dataset.i))' not in htmls.get(5,''): errors.append('P5: deterministic answer-box ordering fix missing')
+          if 'const kinds=TOTAL===12?' not in htmls.get(6,''): errors.append('P6: balanced 12-question type plan missing')
+          if 'const vals=[1,2,3,4,5,6,7,8,9]' not in htmls.get(7,''): errors.append('P7: whole-number syringe range safeguard missing')
+          if 'commutativePairs' not in htmls.get(11,''): errors.append('P11: commutative-operation checker safeguard missing')
           if errors:
-            print('\n'.join('ERROR: '+e for e in errors))
+            for e in errors:
+              safe=e.replace('%','%25').replace('\r','%0D').replace('\n','%0A')
+              print(f'::error title=Sports Fiesta Audit::{safe}')
             sys.exit(1)
           print('PASS: all 11 practices passed source checks and all 11 load the Back to Fiesta Hub button.')
           PY
