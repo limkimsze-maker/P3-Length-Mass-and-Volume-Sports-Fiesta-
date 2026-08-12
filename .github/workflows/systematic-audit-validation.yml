@@ -54,6 +54,8 @@ jobs:
             for fn in required[pid]:
               if not re.search(rf'function\s+{re.escape(fn)}\s*\(',html):
                 errors.append(f'P{pid}: missing required function {fn}()')
+            if 'sports-fiesta-back-to-hub-v1.js?v=20260812a' not in html:
+              errors.append(f'P{pid}: Back to Fiesta Hub button script not loaded')
 
             inline=re.findall(r'<script(?![^>]*\bsrc=)[^>]*>(.*?)</script>',html,re.S|re.I)
             for n,js in enumerate(inline,1):
@@ -62,8 +64,7 @@ jobs:
               if r.returncode:
                 errors.append(f'P{pid}: inline script {n} syntax error: {r.stderr.strip()}')
 
-          # Shared runtime scripts must themselves parse.
-          shared=['sports-fiesta-original-questions-v1.js','sports-fiesta-random-questions-v1.js','sports-fiesta-medal-hook-v4.js','sports-fiesta-2p-12-round-v2.js','sports-fiesta-audit-fixes-v1.js']
+          shared=['sports-fiesta-original-questions-v1.js','sports-fiesta-random-questions-v1.js','sports-fiesta-medal-hook-v4.js','sports-fiesta-2p-12-round-v2.js','sports-fiesta-audit-fixes-v1.js','sports-fiesta-back-to-hub-v1.js']
           for name in shared:
             url=f'https://raw.githubusercontent.com/limkimsze-maker/P3-Length-Mass-and-Volume-Sports-Fiesta-/main/{name}'
             try: js=urllib.request.urlopen(url,timeout=30).read().decode()
@@ -73,7 +74,6 @@ jobs:
             r=subprocess.run(['node','--check',str(f)],capture_output=True,text=True)
             if r.returncode: errors.append(f'{name}: syntax error: {r.stderr.strip()}')
 
-          # Wiring / audit-specific assertions.
           for pid in [4,5,6,9,10,11]:
             h=htmls.get(pid,'')
             if 'sports-fiesta-2p-12-round-v2.js?v=20260812b' not in h:
@@ -97,5 +97,5 @@ jobs:
           if errors:
             print('\n'.join('ERROR: '+e for e in errors))
             sys.exit(1)
-          print('PASS: all 11 practice source files and shared runtime scripts passed the systematic audit validation.')
+          print('PASS: all 11 practices passed source checks and all 11 load the Back to Fiesta Hub button.')
           PY
