@@ -1,0 +1,101 @@
+name: Live Next Button Audit
+on:
+  push:
+    paths:
+      - '.github/workflows/live-next-button-audit.yml'
+permissions:
+  contents: read
+jobs:
+  live-next-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Selenium
+        run: python -m pip install --disable-pip-version-check selenium
+      - name: Test all 11 published practices
+        run: |
+          python - <<'PY'
+          import time, urllib.request, sys
+          from selenium import webdriver
+          from selenium.webdriver.chrome.options import Options
+
+          pages=[
+            ('P1','https://limkimsze-maker.github.io/P3-1-Recall-of-Length-/'),
+            ('P2','https://limkimsze-maker.github.io/P3-2.-Length-Conversion/'),
+            ('P3','https://limkimsze-maker.github.io/P3-3-Recall-of-Mass/'),
+            ('P4','https://limkimsze-maker.github.io/P3-4-Mass-Reading/'),
+            ('P5','https://limkimsze-maker.github.io/P3-5-Mass-Conversion/'),
+            ('P6','https://limkimsze-maker.github.io/P3-6-Recall-Volume/'),
+            ('P7','https://limkimsze-maker.github.io/P3-7-Reading-of-Volume/'),
+            ('P8','https://limkimsze-maker.github.io/P3-8-measuring-volumes-in-litres-and-millimetres/'),
+            ('P9','https://limkimsze-maker.github.io/P3-9-measuring-volumes-in-litres-and-mililitres/'),
+            ('P10','https://limkimsze-maker.github.io/P3-10-Recall-Word-Problems/'),
+            ('P11','https://limkimsze-maker.github.io/P3-11-Length-Mass-and-Volume-Word-Problems/'),
+          ]
+
+          guard_url='https://limkimsze-maker.github.io/P3-Length-Mass-and-Volume-Sports-Fiesta-/sports-fiesta-next-guard-v1.js'
+          for attempt in range(30):
+            try:
+              txt=urllib.request.urlopen(guard_url+'?audit='+str(time.time()),timeout=15).read().decode('utf-8','ignore')
+              if '__sportsFiestaNextGuardV1' in txt: break
+            except Exception: pass
+            time.sleep(4)
+          else: raise SystemExit('Shared Next guard is not live yet')
+
+          for name,url in pages:
+            ok=False
+            for attempt in range(30):
+              try:
+                html=urllib.request.urlopen(url+'?audit='+str(time.time()),timeout=15).read().decode('utf-8','ignore')
+                if 'sports-fiesta-next-guard-v1.js' in html and 'sports-fiesta-2p-12-round-v1.js' not in html:
+                  ok=True; break
+              except Exception: pass
+              time.sleep(4)
+            if not ok: raise SystemExit(f'{name}: published page has not received the clean Next-guard wiring')
+
+          opts=Options()
+          opts.add_argument('--headless=new')
+          opts.add_argument('--no-sandbox')
+          opts.add_argument('--disable-dev-shm-usage')
+          opts.add_argument('--window-size=1440,1000')
+          driver=webdriver.Chrome(options=opts)
+          failures=[]
+          try:
+            for name,url in pages:
+              try:
+                driver.get(url+'?audit='+str(time.time()))
+                time.sleep(1.2)
+                started=driver.execute_script('''
+                  try{
+                    if(typeof window.startGame==='function'){window.startGame(1);return 'startGame';}
+                    if(typeof window.start==='function'){window.start(1);return 'start';}
+                    const b=[...document.querySelectorAll('button')].find(x=>/1\s*Player/i.test(x.textContent||''));
+                    if(b){b.click();return 'button';}
+                    return '';
+                  }catch(e){return 'ERR:'+e.message}
+                ''')
+                if not started or str(started).startswith('ERR:'):
+                  raise RuntimeError('could not start game: '+str(started))
+                time.sleep(.6)
+                before=driver.execute_script("return (document.getElementById('round')||document.querySelector('.round'))?.textContent?.trim()||''")
+                found=driver.execute_script('''
+                  const b=document.getElementById('nextBtn')||document.getElementById('next')||[...document.querySelectorAll('button')].find(x=>/^\s*Next\b/i.test(x.textContent||''));
+                  if(!b)return false;
+                  b.classList.remove('hidden');b.style.display='block';b.disabled=false;b.removeAttribute('disabled');
+                  b.click();return true;
+                ''')
+                if not found: raise RuntimeError('Next button not found')
+                time.sleep(.8)
+                after=driver.execute_script("return (document.getElementById('round')||document.querySelector('.round'))?.textContent?.trim()||''")
+                results=driver.execute_script("const r=document.getElementById('results');return !!(r&&r.classList.contains('active'))")
+                if before==after and not results:
+                  raise RuntimeError(f'round did not advance ({before!r} -> {after!r})')
+                print(f'{name}: PASS {before!r} -> {after!r}')
+              except Exception as e:
+                failures.append(f'{name}: {e}')
+                print(f'{name}: FAIL {e}',file=sys.stderr)
+          finally:
+            driver.quit()
+          if failures:
+            raise SystemExit('\n'.join(failures))
+          print('ALL 11 LIVE NEXT-BUTTON TESTS PASSED')
+          PY
