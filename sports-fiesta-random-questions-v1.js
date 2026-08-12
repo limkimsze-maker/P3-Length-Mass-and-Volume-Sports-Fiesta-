@@ -19,6 +19,7 @@
       return JSON.stringify(q, (k, v) => {
         if (typeof v === 'function') return undefined;
         if (k === 'render') return undefined;
+        if ((k === 'options' || k === 'o') && Array.isArray(v)) return [...v].map(String).sort();
         return v;
       });
     } catch (_) {
