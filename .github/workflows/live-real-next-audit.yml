@@ -1,0 +1,151 @@
+name: Live Real Next Audit
+on:
+  push:
+    paths:
+      - '.github/workflows/live-real-next-audit.yml'
+permissions:
+  contents: read
+jobs:
+  real-next:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {name: P1-1P, url: 'https://limkimsze-maker.github.io/P3-1-Recall-of-Length-/', mode: 1, level: none}
+          - {name: P1-2P, url: 'https://limkimsze-maker.github.io/P3-1-Recall-of-Length-/', mode: 2, level: none}
+          - {name: P2-E-1P, url: 'https://limkimsze-maker.github.io/P3-2.-Length-Conversion/', mode: 1, level: easy}
+          - {name: P2-E-2P, url: 'https://limkimsze-maker.github.io/P3-2.-Length-Conversion/', mode: 2, level: easy}
+          - {name: P2-I-1P, url: 'https://limkimsze-maker.github.io/P3-2.-Length-Conversion/', mode: 1, level: intermediate}
+          - {name: P2-I-2P, url: 'https://limkimsze-maker.github.io/P3-2.-Length-Conversion/', mode: 2, level: intermediate}
+          - {name: P2-H-1P, url: 'https://limkimsze-maker.github.io/P3-2.-Length-Conversion/', mode: 1, level: hard}
+          - {name: P2-H-2P, url: 'https://limkimsze-maker.github.io/P3-2.-Length-Conversion/', mode: 2, level: hard}
+          - {name: P3-1P, url: 'https://limkimsze-maker.github.io/P3-3-Recall-of-Mass/', mode: 1, level: none}
+          - {name: P3-2P, url: 'https://limkimsze-maker.github.io/P3-3-Recall-of-Mass/', mode: 2, level: none}
+          - {name: P4-1P, url: 'https://limkimsze-maker.github.io/P3-4-Mass-Reading/', mode: 1, level: none}
+          - {name: P4-2P, url: 'https://limkimsze-maker.github.io/P3-4-Mass-Reading/', mode: 2, level: none}
+          - {name: P5-E-1P, url: 'https://limkimsze-maker.github.io/P3-5-Mass-Conversion/', mode: 1, level: easy}
+          - {name: P5-E-2P, url: 'https://limkimsze-maker.github.io/P3-5-Mass-Conversion/', mode: 2, level: easy}
+          - {name: P5-I-1P, url: 'https://limkimsze-maker.github.io/P3-5-Mass-Conversion/', mode: 1, level: intermediate}
+          - {name: P5-I-2P, url: 'https://limkimsze-maker.github.io/P3-5-Mass-Conversion/', mode: 2, level: intermediate}
+          - {name: P5-H-1P, url: 'https://limkimsze-maker.github.io/P3-5-Mass-Conversion/', mode: 1, level: hard}
+          - {name: P5-H-2P, url: 'https://limkimsze-maker.github.io/P3-5-Mass-Conversion/', mode: 2, level: hard}
+          - {name: P6-1P, url: 'https://limkimsze-maker.github.io/P3-6-Recall-Volume/', mode: 1, level: none}
+          - {name: P6-2P, url: 'https://limkimsze-maker.github.io/P3-6-Recall-Volume/', mode: 2, level: none}
+          - {name: P7-E-1P, url: 'https://limkimsze-maker.github.io/P3-7-Reading-of-Volume/', mode: 1, level: easy}
+          - {name: P7-E-2P, url: 'https://limkimsze-maker.github.io/P3-7-Reading-of-Volume/', mode: 2, level: easy}
+          - {name: P7-I-1P, url: 'https://limkimsze-maker.github.io/P3-7-Reading-of-Volume/', mode: 1, level: intermediate}
+          - {name: P7-I-2P, url: 'https://limkimsze-maker.github.io/P3-7-Reading-of-Volume/', mode: 2, level: intermediate}
+          - {name: P7-H-1P, url: 'https://limkimsze-maker.github.io/P3-7-Reading-of-Volume/', mode: 1, level: hard}
+          - {name: P7-H-2P, url: 'https://limkimsze-maker.github.io/P3-7-Reading-of-Volume/', mode: 2, level: hard}
+          - {name: P8-E-1P, url: 'https://limkimsze-maker.github.io/P3-8-measuring-volumes-in-litres-and-millimetres/', mode: 1, level: easy}
+          - {name: P8-E-2P, url: 'https://limkimsze-maker.github.io/P3-8-measuring-volumes-in-litres-and-millimetres/', mode: 2, level: easy}
+          - {name: P8-I-1P, url: 'https://limkimsze-maker.github.io/P3-8-measuring-volumes-in-litres-and-millimetres/', mode: 1, level: intermediate}
+          - {name: P8-I-2P, url: 'https://limkimsze-maker.github.io/P3-8-measuring-volumes-in-litres-and-millimetres/', mode: 2, level: intermediate}
+          - {name: P9-E-1P, url: 'https://limkimsze-maker.github.io/P3-9-measuring-volumes-in-litres-and-mililitres/', mode: 1, level: easy}
+          - {name: P9-E-2P, url: 'https://limkimsze-maker.github.io/P3-9-measuring-volumes-in-litres-and-mililitres/', mode: 2, level: easy}
+          - {name: P9-I-1P, url: 'https://limkimsze-maker.github.io/P3-9-measuring-volumes-in-litres-and-mililitres/', mode: 1, level: intermediate}
+          - {name: P9-I-2P, url: 'https://limkimsze-maker.github.io/P3-9-measuring-volumes-in-litres-and-mililitres/', mode: 2, level: intermediate}
+          - {name: P10-1P, url: 'https://limkimsze-maker.github.io/P3-10-Recall-Word-Problems/', mode: 1, level: none}
+          - {name: P10-2P, url: 'https://limkimsze-maker.github.io/P3-10-Recall-Word-Problems/', mode: 2, level: none}
+          - {name: P11-1P, url: 'https://limkimsze-maker.github.io/P3-11-Length-Mass-and-Volume-Word-Problems/', mode: 1, level: none}
+          - {name: P11-2P, url: 'https://limkimsze-maker.github.io/P3-11-Length-Mass-and-Volume-Word-Problems/', mode: 2, level: none}
+    steps:
+      - name: Install Selenium
+        run: python -m pip install --disable-pip-version-check selenium
+      - name: Real answer and Next test
+        env:
+          TEST_URL: ${{ matrix.url }}
+          TEST_MODE: ${{ matrix.mode }}
+          TEST_LEVEL: ${{ matrix.level }}
+        run: |
+          python - <<'PY'
+          import os,time
+          from selenium import webdriver
+          from selenium.webdriver.chrome.options import Options
+          from selenium.webdriver.support.ui import WebDriverWait
+          url=os.environ['TEST_URL']; mode=int(os.environ['TEST_MODE']); level=os.environ['TEST_LEVEL']
+          o=Options();o.add_argument('--headless=new');o.add_argument('--no-sandbox');o.add_argument('--disable-dev-shm-usage');o.add_argument('--window-size=1440,1000')
+          d=webdriver.Chrome(options=o); w=WebDriverWait(d,8)
+          JS_SOLVE=r'''
+          const norm=x=>String(x??'').replace(/\s+/g,' ').trim();
+          const vis=e=>{if(!e)return false;const s=getComputedStyle(e);return s.display!=='none'&&s.visibility!=='hidden'&&!e.disabled};
+          const setv=(e,v)=>{e.value=String(v);e.dispatchEvent(new Event('input',{bubbles:true}));e.dispatchEvent(new Event('change',{bubbles:true}));};
+          let q=null;
+          try{if(typeof currentQuestion!=='undefined'&&currentQuestion)q=currentQuestion}catch(e){}
+          try{if(!q&&typeof questions!=='undefined'&&Array.isArray(questions))q=questions[round]}catch(e){}
+          try{if(!q&&typeof qs!=='undefined'&&Array.isArray(qs))q=qs[round]}catch(e){}
+          if(!q)throw new Error('No current question object');
+          // MCQ first.
+          let target=(q.correct!==undefined?q.correct:q.answer);
+          if(target!==undefined && (typeof target==='string'||typeof target==='number')){
+            const b=[...document.querySelectorAll('button')].find(x=>vis(x)&&norm(x.textContent)===norm(target));
+            if(b){b.click();return 'choice:'+norm(target)}
+          }
+          // Explicit field maps.
+          let filled=false;
+          if(Array.isArray(q.fields)&&q.expected&&typeof q.expected==='object'){
+            q.fields.forEach(id=>{const e=document.getElementById(id);if(e){setv(e,q.expected[id]);filled=true}});
+          }else if(Array.isArray(q.fields)&&Array.isArray(q.answers)){
+            q.fields.forEach((id,i)=>{const e=document.getElementById(id);if(e&&q.answers[i]!==undefined){setv(e,q.answers[i]);filled=true}});
+          }else if(Array.isArray(q.fields)&&Array.isArray(q.answer)){
+            q.fields.forEach((id,i)=>{const e=document.getElementById(id);if(e&&q.answer[i]!==undefined){setv(e,q.answer[i]);filled=true}});
+          }
+          // Common measurement shapes.
+          const kg=document.getElementById('kgInput'), g=document.getElementById('gInput');
+          if(kg&&g){
+            if(q.totalGrams!==undefined){setv(kg,Math.floor(q.totalGrams/1000));setv(g,q.totalGrams%1000);filled=true}
+            else if(q.kg!==undefined&&q.g!==undefined){setv(kg,q.kg);setv(g,q.g);filled=true}
+          }
+          const li=document.getElementById('litreInput'), mi=document.getElementById('mlInput');
+          if(li&&mi){
+            let t=q.totalMl;
+            if(t===undefined&&q.answerMl!==undefined)t=q.answerMl;
+            if(t!==undefined){setv(li,Math.floor(Number(t)/1000));setv(mi,Number(t)%1000);filled=true}
+            else if(q.litres!==undefined&&q.ml!==undefined){setv(li,q.litres);setv(mi,q.ml);filled=true}
+          }
+          const ai=document.getElementById('answerInput');
+          if(ai&&!filled){
+            let a=q.answer;
+            if(a===undefined)a=q.correct;
+            if(a===undefined)a=q.value;
+            if(a!==undefined&&(typeof a==='string'||typeof a==='number')){setv(ai,a);filled=true}
+          }
+          // Generic visible inputs using answer arrays/maps when IDs differ.
+          if(!filled){
+            const ins=[...document.querySelectorAll('input')].filter(vis);
+            let vals=null;
+            if(Array.isArray(q.answers))vals=q.answers;
+            else if(Array.isArray(q.answer))vals=q.answer;
+            else if(q.expected&&typeof q.expected==='object')vals=Object.values(q.expected);
+            if(vals&&vals.length>=ins.length&&ins.length){ins.forEach((e,i)=>setv(e,vals[i]));filled=true}
+          }
+          if(!filled)throw new Error('Could not derive correct answer from '+JSON.stringify(q));
+          const cb=document.getElementById('checkBtn')||document.getElementById('check')||[...document.querySelectorAll('button')].find(x=>vis(x)&&/check answer/i.test(x.textContent||''));
+          if(cb){cb.click();return 'input-check'}
+          if(typeof checkAnswer==='function'){checkAnswer();return 'fn-checkAnswer'}
+          if(typeof checkInputs==='function'){checkInputs();return 'fn-checkInputs'}
+          throw new Error('No checker found');
+          '''
+          try:
+            d.get(url+'?audit='+str(time.time()));time.sleep(1.0)
+            if level!='none':
+              d.execute_script("if(typeof setDifficulty==='function')setDifficulty(arguments[0])",level)
+            started=d.execute_script("if(typeof startGame==='function'){startGame(arguments[0]);return true}if(typeof start==='function'){start(arguments[0]);return true}return false",mode)
+            if not started: raise RuntimeError('Could not start game')
+            time.sleep(.5)
+            for step in range(2):
+              before=d.execute_script("return (document.getElementById('round')||document.querySelector('.round'))?.textContent?.trim()||''")
+              how=d.execute_script(JS_SOLVE)
+              def next_ready(_):
+                return d.execute_script("const b=document.getElementById('nextBtn')||document.getElementById('next')||[...document.querySelectorAll('button')].find(x=>/^\\s*Next/i.test(x.textContent||'')||/Results|Throw/i.test(x.textContent||''));if(!b)return false;const s=getComputedStyle(b);return s.display!=='none'&&s.visibility!=='hidden'&&!b.disabled")
+              w.until(next_ready)
+              d.execute_script("const b=document.getElementById('nextBtn')||document.getElementById('next')||[...document.querySelectorAll('button')].find(x=>/^\\s*Next/i.test(x.textContent||'')||/Results|Throw/i.test(x.textContent||''));b.click()")
+              def advanced(_):
+                return d.execute_script("const r=document.getElementById('results');const t=(document.getElementById('round')||document.querySelector('.round'))?.textContent?.trim()||'';return (r&&r.classList.contains('active'))||t!==arguments[0]",before)
+              w.until(advanced)
+              after=d.execute_script("return (document.getElementById('round')||document.querySelector('.round'))?.textContent?.trim()||''")
+              print(f'PASS step {step+1}: {how} {before!r}->{after!r}')
+          finally:
+            d.quit()
+          PY
