@@ -3,6 +3,7 @@ on:
   push:
     paths:
       - '.github/workflows/systematic-audit-validation.yml'
+      - 'sports-fiesta-*.js'
 permissions:
   contents: read
 jobs:
