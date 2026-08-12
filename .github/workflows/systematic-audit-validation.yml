@@ -14,33 +14,9 @@ jobs:
           python - <<'PY'
           import re, urllib.request, pathlib, subprocess, sys
 
-          repos={
-            1:'P3-1-Recall-of-Length-',
-            2:'P3-2.-Length-Conversion',
-            3:'P3-3-Recall-of-Mass',
-            4:'P3-4-Mass-Reading',
-            5:'P3-5-Mass-Conversion',
-            6:'P3-6-Recall-Volume',
-            7:'P3-7-Reading-of-Volume',
-            8:'P3-8-measuring-volumes-in-litres-and-millimetres',
-            9:'P3-9-measuring-volumes-in-litres-and-mililitres',
-            10:'P3-10-Recall-Word-Problems',
-            11:'P3-11-Length-Mass-and-Volume-Word-Problems'
-          }
-          required={
-            1:['buildQuestions','renderQuestion','finish'],
-            2:['buildQuestions','checkInputs','finishGame'],
-            3:['build','render','finish'],
-            4:['buildQuestions','checkAnswer','finish'],
-            5:['buildQuestions','checkAnswer','finish'],
-            6:['buildQuestions','checkAnswer','finish'],
-            7:['buildQuestions','checkAnswer','finish'],
-            8:['buildQuestions','checkAnswer','finish'],
-            9:['buildQuestions','checkAnswer','finish'],
-            10:['buildQuestions','checkAnswer','finish'],
-            11:['buildQuestions','checkAnswer','finish']
-          }
-          errors=[]; htmls={}
+          repos={1:'P3-1-Recall-of-Length-',2:'P3-2.-Length-Conversion',3:'P3-3-Recall-of-Mass',4:'P3-4-Mass-Reading',5:'P3-5-Mass-Conversion',6:'P3-6-Recall-Volume',7:'P3-7-Reading-of-Volume',8:'P3-8-measuring-volumes-in-litres-and-millimetres',9:'P3-9-measuring-volumes-in-litres-and-mililitres',10:'P3-10-Recall-Word-Problems',11:'P3-11-Length-Mass-and-Volume-Word-Problems'}
+          required={1:['buildQuestions','renderQuestion','finish'],2:['buildQuestions','checkInputs','finishGame'],3:['build','render','finish'],4:['buildQuestions','checkAnswer','finish'],5:['buildQuestions','checkAnswer','finish'],6:['buildQuestions','checkAnswer','finish'],7:['buildQuestions','checkAnswer','finish'],8:['buildQuestions','checkAnswer','finish'],9:['buildQuestions','checkAnswer','finish'],10:['buildQuestions','checkAnswer','finish'],11:['buildQuestions','checkAnswer','finish']}
+          errors=[]; htmls={}; shared_code={}
           tmp=pathlib.Path('/tmp/sports-fiesta-audit'); tmp.mkdir(exist_ok=True)
           for pid,repo in repos.items():
             url=f'https://raw.githubusercontent.com/limkimsze-maker/{repo}/main/index.html'
@@ -52,20 +28,20 @@ jobs:
             if 'sports-fiesta-back-to-hub-v1.js?v=20260812a' not in html: errors.append(f'P{pid}: Back to Fiesta Hub button script not loaded')
             inline=re.findall(r'<script(?![^>]*\bsrc=)[^>]*>(.*?)</script>',html,re.S|re.I)
             for n,js in enumerate(inline,1):
-              f=tmp/f'p{pid}-inline-{n}.js'; f.write_text(js)
-              r=subprocess.run(['node','--check',str(f)],capture_output=True,text=True)
+              f=tmp/f'p{pid}-inline-{n}.js'; f.write_text(js); r=subprocess.run(['node','--check',str(f)],capture_output=True,text=True)
               if r.returncode: errors.append(f'P{pid}: inline script {n} syntax error: {r.stderr.strip()}')
-          shared=['sports-fiesta-original-questions-v1.js','sports-fiesta-random-questions-v1.js','sports-fiesta-medal-hook-v4.js','sports-fiesta-2p-12-round-v2.js','sports-fiesta-audit-fixes-v1.js','sports-fiesta-back-to-hub-v1.js']
+          shared=['sports-fiesta-original-questions-v1.js','sports-fiesta-random-questions-v1.js','sports-fiesta-medal-hook-v4.js','sports-fiesta-2p-12-round-v1.js','sports-fiesta-2p-12-round-v2.js','sports-fiesta-audit-fixes-v1.js','sports-fiesta-back-to-hub-v1.js']
           for name in shared:
             url=f'https://raw.githubusercontent.com/limkimsze-maker/P3-Length-Mass-and-Volume-Sports-Fiesta-/main/{name}'
-            try: js=urllib.request.urlopen(url,timeout=30).read().decode()
+            try: js=urllib.request.urlopen(url,timeout=30).read().decode(); shared_code[name]=js
             except Exception as e: errors.append(f'{name}: could not fetch: {e}'); continue
             f=tmp/name; f.write_text(js); r=subprocess.run(['node','--check',str(f)],capture_output=True,text=True)
             if r.returncode: errors.append(f'{name}: syntax error: {r.stderr.strip()}')
+          if shared_code.get('sports-fiesta-2p-12-round-v1.js') != shared_code.get('sports-fiesta-2p-12-round-v2.js'):
+            errors.append('Shared 2P v1 and v2 are not identical; the legacy normaliser could restore unfair behaviour')
           for pid in [4,5,6,9,10,11]:
             h=htmls.get(pid,'')
-            if 'sports-fiesta-2p-12-round-v2.js?v=20260812b' not in h: errors.append(f'P{pid}: fair 2P v2 layer not loaded')
-            if 'sports-fiesta-2p-12-round-v1.js' in h: errors.append(f'P{pid}: obsolete unfair 2P v1 layer still loaded')
+            if 'sports-fiesta-2p-12-round-v1.js' not in h and 'sports-fiesta-2p-12-round-v2.js' not in h: errors.append(f'P{pid}: fair 12-question 2P layer not loaded')
           if 'sports-fiesta-audit-fixes-v1.js' not in htmls.get(1,''): errors.append('P1: long-match uniqueness audit layer missing')
           if 'sports-fiesta-audit-fixes-v1.js' not in htmls.get(11,''): errors.append('P11: route-range audit layer missing')
           if '.sort((a,b)=>Number(a.dataset.i)-Number(b.dataset.i))' not in htmls.get(5,''): errors.append('P5: deterministic answer-box ordering fix missing')
@@ -73,9 +49,7 @@ jobs:
           if 'const vals=[1,2,3,4,5,6,7,8,9]' not in htmls.get(7,''): errors.append('P7: whole-number syringe range safeguard missing')
           if 'commutativePairs' not in htmls.get(11,''): errors.append('P11: commutative-operation checker safeguard missing')
           if errors:
-            for e in errors:
-              safe=e.replace('%','%25').replace('\r','%0D').replace('\n','%0A')
-              print(f'::error title=Sports Fiesta Audit::{safe}')
+            for e in errors: print(f'::error title=Sports Fiesta Audit::{e.replace("%","%25").replace(chr(13),"%0D").replace(chr(10),"%0A")}')
             sys.exit(1)
           print('PASS: all 11 practices passed source checks and all 11 load the Back to Fiesta Hub button.')
           PY
