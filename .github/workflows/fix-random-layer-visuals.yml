@@ -1,4 +1,4 @@
-name: Fix random layer visuals
+name: Strengthen random question duplicate detection
 on:
   push:
     paths:
@@ -10,22 +10,28 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Use supported Practice 1 visuals
+      - name: Normalize answer choices in duplicate fingerprint
         run: |
           python - <<'PY'
           from pathlib import Path
           p=Path('sports-fiesta-random-questions-v1.js')
           s=p.read_text()
-          s=s.replace("{name:'school shoe',type:'shoe',value:24,unit:'cm',dimension:'length'},", "{name:'magazine',type:'book',value:27,unit:'cm',dimension:'length'},")
-          s=s.replace("{name:'lunch box',type:'box',value:20,unit:'cm',dimension:'length'},", "{name:'marker pen',type:'pen',value:14,unit:'cm',dimension:'length'},")
-          s=s.replace("{name:'school shoe',type:'shoe',measure:'Length ?',ans:'24 cm',ops:['24 cm','24 m','240 m','2 m']},", "{name:'magazine',type:'book',measure:'Length ?',ans:'27 cm',ops:['27 cm','27 m','270 m','3 m']},")
-          s=s.replace("{name:'lunch box',type:'box',measure:'Length ?',ans:'20 cm',ops:['20 cm','20 m','200 m','2 m']},", "{name:'marker pen',type:'pen',measure:'Length ?',ans:'14 cm',ops:['14 cm','14 m','140 m','1 m']},")
+          old="""        if (typeof v === 'function') return undefined;
+        if (k === 'render') return undefined;
+        return v;"""
+          new="""        if (typeof v === 'function') return undefined;
+        if (k === 'render') return undefined;
+        if ((k === 'options' || k === 'o') && Array.isArray(v)) return [...v].map(String).sort();
+        return v;"""
+          if old in s:
+              s=s.replace(old,new,1)
           p.write_text(s)
           PY
+          node --check sports-fiesta-random-questions-v1.js
       - name: Commit patch
         run: |
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add sports-fiesta-random-questions-v1.js
-          git diff --cached --quiet || git commit -m "Use supported visuals in random question layer"
+          git diff --cached --quiet || git commit -m "Ignore option order when detecting duplicate questions"
           git push
