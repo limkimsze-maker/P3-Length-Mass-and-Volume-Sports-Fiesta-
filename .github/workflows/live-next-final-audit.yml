@@ -1,0 +1,101 @@
+name: Live Next Final Audit
+on:
+  push:
+    paths:
+      - '.github/workflows/live-next-final-audit.yml'
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {name: P1-1P, p: 1, path: 'P3-1-Recall-of-Length-', mode: 1, level: none}
+          - {name: P1-2P, p: 1, path: 'P3-1-Recall-of-Length-', mode: 2, level: none}
+          - {name: P2-E-1P, p: 2, path: 'P3-2.-Length-Conversion', mode: 1, level: easy}
+          - {name: P2-E-2P, p: 2, path: 'P3-2.-Length-Conversion', mode: 2, level: easy}
+          - {name: P2-I-1P, p: 2, path: 'P3-2.-Length-Conversion', mode: 1, level: intermediate}
+          - {name: P2-I-2P, p: 2, path: 'P3-2.-Length-Conversion', mode: 2, level: intermediate}
+          - {name: P2-H-1P, p: 2, path: 'P3-2.-Length-Conversion', mode: 1, level: hard}
+          - {name: P2-H-2P, p: 2, path: 'P3-2.-Length-Conversion', mode: 2, level: hard}
+          - {name: P3-1P, p: 3, path: 'P3-3-Recall-of-Mass', mode: 1, level: none}
+          - {name: P3-2P, p: 3, path: 'P3-3-Recall-of-Mass', mode: 2, level: none}
+          - {name: P4-1P, p: 4, path: 'P3-4-Mass-Reading', mode: 1, level: none}
+          - {name: P4-2P, p: 4, path: 'P3-4-Mass-Reading', mode: 2, level: none}
+          - {name: P5-E-1P, p: 5, path: 'P3-5-Mass-Conversion', mode: 1, level: easy}
+          - {name: P5-E-2P, p: 5, path: 'P3-5-Mass-Conversion', mode: 2, level: easy}
+          - {name: P5-I-1P, p: 5, path: 'P3-5-Mass-Conversion', mode: 1, level: intermediate}
+          - {name: P5-I-2P, p: 5, path: 'P3-5-Mass-Conversion', mode: 2, level: intermediate}
+          - {name: P5-H-1P, p: 5, path: 'P3-5-Mass-Conversion', mode: 1, level: hard}
+          - {name: P5-H-2P, p: 5, path: 'P3-5-Mass-Conversion', mode: 2, level: hard}
+          - {name: P6-1P, p: 6, path: 'P3-6-Recall-Volume', mode: 1, level: none}
+          - {name: P6-2P, p: 6, path: 'P3-6-Recall-Volume', mode: 2, level: none}
+          - {name: P7-E-1P, p: 7, path: 'P3-7-Reading-of-Volume', mode: 1, level: easy}
+          - {name: P7-E-2P, p: 7, path: 'P3-7-Reading-of-Volume', mode: 2, level: easy}
+          - {name: P7-I-1P, p: 7, path: 'P3-7-Reading-of-Volume', mode: 1, level: intermediate}
+          - {name: P7-I-2P, p: 7, path: 'P3-7-Reading-of-Volume', mode: 2, level: intermediate}
+          - {name: P7-H-1P, p: 7, path: 'P3-7-Reading-of-Volume', mode: 1, level: hard}
+          - {name: P7-H-2P, p: 7, path: 'P3-7-Reading-of-Volume', mode: 2, level: hard}
+          - {name: P8-E-1P, p: 8, path: 'P3-8-measuring-volumes-in-litres-and-millimetres', mode: 1, level: easy}
+          - {name: P8-E-2P, p: 8, path: 'P3-8-measuring-volumes-in-litres-and-millimetres', mode: 2, level: easy}
+          - {name: P8-I-1P, p: 8, path: 'P3-8-measuring-volumes-in-litres-and-millimetres', mode: 1, level: intermediate}
+          - {name: P8-I-2P, p: 8, path: 'P3-8-measuring-volumes-in-litres-and-millimetres', mode: 2, level: intermediate}
+          - {name: P9-E-1P, p: 9, path: 'P3-9-measuring-volumes-in-litres-and-mililitres', mode: 1, level: easy}
+          - {name: P9-E-2P, p: 9, path: 'P3-9-measuring-volumes-in-litres-and-mililitres', mode: 2, level: easy}
+          - {name: P9-I-1P, p: 9, path: 'P3-9-measuring-volumes-in-litres-and-mililitres', mode: 1, level: intermediate}
+          - {name: P9-I-2P, p: 9, path: 'P3-9-measuring-volumes-in-litres-and-mililitres', mode: 2, level: intermediate}
+          - {name: P10-1P, p: 10, path: 'P3-10-Recall-Word-Problems', mode: 1, level: none}
+          - {name: P10-2P, p: 10, path: 'P3-10-Recall-Word-Problems', mode: 2, level: none}
+          - {name: P11-1P, p: 11, path: 'P3-11-Length-Mass-and-Volume-Word-Problems', mode: 1, level: none}
+          - {name: P11-2P, p: 11, path: 'P3-11-Length-Mass-and-Volume-Word-Problems', mode: 2, level: none}
+    name: ${{ matrix.name }}
+    steps:
+      - run: python -m pip install --disable-pip-version-check selenium
+      - name: Three real-answer Next trials
+        env:
+          P: ${{ matrix.p }}
+          PATH_PART: ${{ matrix.path }}
+          MODE: ${{ matrix.mode }}
+          LEVEL: ${{ matrix.level }}
+        run: |
+          python - <<'PY'
+          import os,time
+          from selenium import webdriver
+          from selenium.webdriver.chrome.options import Options
+          from selenium.webdriver.support.ui import WebDriverWait
+          p=int(os.environ['P']);mode=int(os.environ['MODE']);level=os.environ['LEVEL'];url='https://limkimsze-maker.github.io/'+os.environ['PATH_PART']+'/'
+          o=Options();o.add_argument('--headless=new');o.add_argument('--no-sandbox');o.add_argument('--disable-dev-shm-usage');o.add_argument('--window-size=1440,1000');o.add_argument('--autoplay-policy=no-user-gesture-required')
+          d=webdriver.Chrome(options=o)
+          solve=r'''
+          const p=arguments[0],mode=arguments[1],setv=(e,v)=>{e.value=String(v);e.dispatchEvent(new Event('input',{bubbles:true}));e.dispatchEvent(new Event('change',{bubbles:true}));},norm=x=>String(x??'').replace(/\s+/g,' ').trim(),click=(sel,a)=>{const b=[...document.querySelectorAll(sel)].find(x=>norm(x.textContent)===norm(a));if(!b)throw new Error('option not found '+a);b.click();};
+          if(p===1){const q=questions[round];click(mode===2?'#p1answers .panswer':'#soloAnswers .answer',q.answer);return;}
+          if(p===2){const q=currentQuestion;if(q.mode==='choice'){click('.choiceBtn',q.correct);return;}q.fields.forEach(id=>setv(document.getElementById(id),q.expected[id]));document.getElementById('checkBtn').click();return;}
+          if(p===3){const q=qs[idx];click('.ans',q.a);return;}
+          if(p===4){const t=questions[round].totalGrams;setv(document.getElementById('kgInput'),Math.floor(t/1000));setv(document.getElementById('gInput'),t%1000);document.getElementById('checkBtn').click();return;}
+          if(p===5){const q=questions[round],a=inputs();if(a.length!==q.answers.length)throw new Error('P5 length mismatch');a.forEach((e,i)=>setv(e,q.answers[i]));document.getElementById('checkBtn').click();return;}
+          if(p===6||p===7){setv(document.getElementById('answerInput'),questions[round].answer);document.getElementById('checkBtn').click();return;}
+          if(p===8){const t=questions[round].totalMl;setv(document.getElementById('litreInput'),Math.floor(t/1000));setv(document.getElementById('mlInput'),t%1000);document.getElementById('checkBtn').click();return;}
+          if(p===9||p===10||p===11){const q=questions[round];q.fields.forEach(id=>setv(document.getElementById(id),q.expected[id]));document.getElementById('checkBtn').click();return;}
+          throw new Error('unknown practice');
+          '''
+          try:
+            for trial in range(3):
+              d.get(url+'?finalaudit='+str(time.time()));time.sleep(1.2)
+              if level!='none': d.execute_script("setDifficulty(arguments[0])",level)
+              if not d.execute_script("if(typeof startGame==='function'){startGame(arguments[0]);return true}if(typeof start==='function'){start(arguments[0]);return true}return false",mode):raise RuntimeError('cannot start')
+              time.sleep(.8)
+              before=d.execute_script("return (document.getElementById('round')||document.querySelector('.round')).textContent.trim()")
+              d.execute_script(solve,p,mode)
+              def ready(_):
+                return d.execute_script("const b=document.getElementById('nextBtn')||document.getElementById('next');if(!b)return false;const s=getComputedStyle(b);return s.display!=='none'&&s.visibility!=='hidden'&&!b.disabled")
+              WebDriverWait(d,18).until(ready)
+              d.execute_script("(document.getElementById('nextBtn')||document.getElementById('next')).click()")
+              def advanced(_):
+                return d.execute_script("const now=(document.getElementById('round')||document.querySelector('.round'))?.textContent?.trim()||'';const r=document.getElementById('results');return now!==arguments[0]||!!(r&&r.classList.contains('active'))",before)
+              WebDriverWait(d,8).until(advanced)
+              after=d.execute_script("return (document.getElementById('round')||document.querySelector('.round'))?.textContent?.trim()||'RESULTS'")
+              print('trial',trial+1,before,'->',after,'PASS')
+          finally:d.quit()
+          PY
