@@ -1,4 +1,4 @@
-name: Full Flow Audit v2 Practices 1-3 and 5-11
+name: Full Flow Audit v3 Practices 1-3 and 5-11
 on:
   push:
     paths:
@@ -51,7 +51,7 @@ jobs:
     name: ${{ matrix.name }}
     steps:
       - run: python -m pip install --disable-pip-version-check selenium
-      - name: Play complete game without permitting a mid-game stall
+      - name: Play complete game at human-realistic timing
         env:
           P: ${{ matrix.p }}
           PATH_PART: ${{ matrix.path }}
@@ -64,7 +64,6 @@ jobs:
           from selenium.webdriver.chrome.options import Options
           from selenium.webdriver.support.ui import WebDriverWait
           from selenium.common.exceptions import TimeoutException
-
           p=int(os.environ['P']); mode=int(os.environ['MODE']); level=os.environ['LEVEL']
           url='https://limkimsze-maker.github.io/'+os.environ['PATH_PART']+'/'
           o=Options(); o.add_argument('--headless=new'); o.add_argument('--no-sandbox'); o.add_argument('--disable-dev-shm-usage'); o.add_argument('--window-size=1440,1000'); o.add_argument('--autoplay-policy=no-user-gesture-required')
@@ -81,10 +80,10 @@ jobs:
           throw new Error('unknown practice');
           '''
           try:
-            d.get(url+'?fullflowv2='+str(time.time())); time.sleep(1)
+            d.get(url+'?fullflowv3='+str(time.time())); time.sleep(1)
             if level!='none': d.execute_script("setDifficulty(arguments[0])",level)
             if not d.execute_script("if(typeof startGame==='function'){startGame(arguments[0]);return true}if(typeof start==='function'){start(arguments[0]);return true}return false",mode): raise RuntimeError('cannot start game')
-            time.sleep(.4)
+            time.sleep(.5)
             count=0
             for step in range(20):
               if d.execute_script("const r=document.getElementById('results');return !!(r&&r.classList.contains('active'))"): break
@@ -92,8 +91,7 @@ jobs:
               d.execute_script(solve,p,mode)
               def next_or_results(_):
                 return d.execute_script("const r=document.getElementById('results');if(r&&r.classList.contains('active'))return 'results';const b=document.getElementById('nextBtn')||document.getElementById('next');if(!b)return false;const s=getComputedStyle(b);return s.display!=='none'&&s.visibility!=='hidden'&&!b.disabled?'next':false")
-              try:
-                action=WebDriverWait(d,18).until(next_or_results)
+              try: action=WebDriverWait(d,18).until(next_or_results)
               except TimeoutException:
                 state=d.execute_script("return {round:(document.getElementById('round')||document.querySelector('.round'))?.textContent?.trim()||'',feedback:document.getElementById('feedback')?.textContent?.trim()||'',results:!!(document.getElementById('results')?.classList.contains('active')),qlen:typeof questions!=='undefined'?questions.length:null,roundVar:typeof round!=='undefined'?round:null,idx:typeof idx!=='undefined'?idx:null};")
                 raise RuntimeError(f'mid-game stall after solving step {step+1}; before={before}; state={state}')
@@ -106,6 +104,7 @@ jobs:
               except TimeoutException:
                 state=d.execute_script("return {round:(document.getElementById('round')||document.querySelector('.round'))?.textContent?.trim()||'',feedback:document.getElementById('feedback')?.textContent?.trim()||'',results:!!(document.getElementById('results')?.classList.contains('active')),qlen:typeof questions!=='undefined'?questions.length:null,roundVar:typeof round!=='undefined'?round:null,idx:typeof idx!=='undefined'?idx:null};")
                 raise RuntimeError(f'Next did not advance after step {step+1}; before={before}; state={state}')
+              time.sleep(.30)
             done=d.execute_script("const r=document.getElementById('results');return !!(r&&r.classList.contains('active'))")
             if not done: raise RuntimeError(f'game did not reach Results after {count} solved rounds')
             print(f'PASS practice={p} mode={mode} level={level}: full game completed in {count} solved rounds')
