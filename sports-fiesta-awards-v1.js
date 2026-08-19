@@ -92,13 +92,16 @@
 
   function qualifiesOldRecord(x) {
     if (!x) return false;
-    if (x.awardRules === 'v4-medal-only' || ['v1','v2','v3'].includes(x.awardRules)) return x.pieceEarned === true;
     const oldWinner = x.lastWinner;
+    const awardWinner = x.lastAwardWinner;
     const winnerQualified =
       Number(x.lastMode) === 2 &&
       (oldWinner === 'p1' || oldWinner === 'p2' || oldWinner === 'tie' ||
        Number(oldWinner) === 1 || Number(oldWinner) === 2);
-    return x.perfectSingle === true || winnerQualified;
+    const awardWinnerQualified =
+      awardWinner === 'p1' || awardWinner === 'p2' || awardWinner === 'tie' ||
+      Number(awardWinner) === 1 || Number(awardWinner) === 2;
+    return x.perfectSingle === true || winnerQualified || awardWinnerQualified;
   }
 
   function updateProgress(gm, outcome) {
