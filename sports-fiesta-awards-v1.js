@@ -8,6 +8,7 @@
 
   const HUB_KEY = 'sportsFiestaHubProgress_v1';
   const HUB_URL = 'https://limkimsze-maker.github.io/P3-Length-Mass-and-Volume-Sports-Fiesta-/';
+  const GOLD_KEY = 'sportsFiestaFinalGoldAwarded_v1';
   let handledResult = false;
   let timer = null;
 
@@ -145,9 +146,17 @@
     };
   }
 
+  function goldAlreadyAwarded() {
+    try { return localStorage.getItem(GOLD_KEY) === '1'; } catch (_) { return false; }
+  }
+
+  function markGoldAwarded() {
+    try { localStorage.setItem(GOLD_KEY, '1'); } catch (_) {}
+  }
+
   function showCeremony(gm, outcome, progress) {
     const winner = gm === 1 ? 'p1' : outcome.winner;
-    const awardGoldNow = progress.newlyEarned && progress.piecesBefore < 11 && progress.piecesAfter === 11;
+    const awardGoldNow = progress.qualifies && progress.piecesAfter === 11 && !goldAlreadyAwarded();
 
     const frame = document.createElement('iframe');
     frame.title = 'Sports Fiesta medal ceremony';
@@ -189,6 +198,7 @@
 
         const showGold = () => {
           stage = 'gold';
+          markGoldAwarded();
           w.showMedalCeremony(false, 'p1', 'gold');
           const sub = d.getElementById('mcSub');
           const msg = d.getElementById('mcMessage');
