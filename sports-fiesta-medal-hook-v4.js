@@ -1,4 +1,4 @@
-/* SF_MEDAL_HOOK_SECURITY_V6: verified end-screen completion + Practice 1 race fix */
+/* SF_MEDAL_HOOK_SECURITY_V7: verified end-screen completion + tie podium + Practice 1 race fix */
 (() => {
   const script=document.currentScript;
   const PRACTICE_ID=Number(script?.dataset?.practice||0);
@@ -237,17 +237,18 @@
     let data={};try{data=JSON.parse(localStorage.getItem(HUB_KEY)||'{}')||{}}catch(e){}
     const old=data[PRACTICE_ID]||{};
     const oldWinner=old.lastWinner;
-    const oldWinnerQualified=Number(old.lastMode)===2&&(oldWinner==='p1'||oldWinner==='p2'||Number(oldWinner)===1||Number(oldWinner)===2);
-    const priorQualified=old.awardRules==='v1'?!!old.pieceEarned:(!!old.perfectSingle||oldWinnerQualified);
+    const oldWinnerQualified=Number(old.lastMode)===2&&(oldWinner==='p1'||oldWinner==='p2'||oldWinner==='tie'||Number(oldWinner)===1||Number(oldWinner)===2);
+    const priorQualified=['v1','v2','v3'].includes(old.awardRules)?!!old.pieceEarned:(!!old.perfectSingle||oldWinnerQualified);
+    const isTie=gm===2&&winner==='tie';
     const winnerNum=winner==='p1'?1:winner==='p2'?2:0;
-    const qualifies=gm===1?!!perfect:winnerNum>0;
+    const qualifies=gm===1?!!perfect:(winnerNum>0||isTie);
     const pieceEarned=priorQualified||qualifies;
     const perfectSingle=!!old.perfectSingle||(gm===1&&!!perfect);
     data[PRACTICE_ID]={
       ...old,completed:true,pieceEarned,awardQualified:pieceEarned,perfectSingle,
-      verified:true,source:'game-v5',awardRules:'v1',updatedAt:new Date().toISOString(),
-      lastMode:gm,lastWinner:gm===2?winnerNum:(old.lastWinner??0),
-      lastAwardWinner:qualifies?(gm===1?1:winnerNum):(old.lastAwardWinner??0)
+      verified:true,source:'game-v5',awardRules:'v3',updatedAt:new Date().toISOString(),
+      lastMode:gm,lastWinner:gm===2?(isTie?'tie':winnerNum):(old.lastWinner??0),
+      lastAwardWinner:qualifies?(gm===1?1:(isTie?'tie':winnerNum)):(old.lastAwardWinner??0)
     };
     localStorage.setItem(HUB_KEY,JSON.stringify(data));
     let completed=0,perfectCount=0,pieces=0;
@@ -263,10 +264,10 @@
 
   function ceremony(gm,o,p){
     const winner=gm===1?'p1':o.winner;
-    const fullGold=gm===1&&o.perfect&&p.perfectCount===11;
+    const fullGold=p.pieces===11;
     const frame=document.createElement('iframe');
     frame.title='Sports Fiesta medal ceremony';
-    frame.src=HUB_URL+'?ceremonyBridge=award-v1&t='+Date.now();
+    frame.src=HUB_URL+'?ceremonyBridge=award-v3&t='+Date.now();
     Object.assign(frame.style,{position:'fixed',inset:'0',width:'100%',height:'100%',border:'0',zIndex:'2147483647',background:'#185b9d'});
     document.body.appendChild(frame);
     frame.onload=()=>{
@@ -281,13 +282,17 @@
           w.showMedalCeremony(false,winner,'piece');
           const sub=d.getElementById('mcSub'),msg=d.getElementById('mcMessage');
           if(sub)sub.textContent=`Practice ${PRACTICE_ID} of 11 • ${SPORT}`;
-          if(msg)msg.textContent=gm===1?'Player 1 earns 1/11 of the medal for a perfect score!':`${winner==='p2'?'Player 2':'Player 1'} earns 1/11 of the medal for winning!`;
+          if(msg){
+            if(gm===1)msg.textContent='Player 1 earns a 1/11 medal for a perfect score!';
+            else if(winner==='tie')msg.textContent='It is a tie! Player 1 and Player 2 both receive a 1/11 medal on the rostrum!';
+            else msg.textContent=`${winner==='p2'?'Player 2':'Player 1'} wins and earns a 1/11 medal!`;
+          }
         };
         const showGold=()=>{
           stage='gold';
           w.showMedalCeremony(false,'p1','gold');
           const sub=d.getElementById('mcSub'),msg=d.getElementById('mcMessage');
-          if(sub)sub.textContent='All 11 lessons completed perfectly by Player 1!';
+          if(sub)sub.textContent='All 11 Sports Fiesta lessons completed!';
           if(msg)msg.textContent='🏆 Player 1 receives the Sports Fiesta GOLD MEDAL! 🏆';
         };
         showPiece();
@@ -594,7 +599,7 @@
             const d=node.contentDocument,w=winner();if(!d||w<0)return;
             const sub=d.getElementById('mcSub'),msg=d.getElementById('mcMessage');
             if(sub)sub.textContent=`Race complete — Player 1: ${scores[0]} • Player 2: ${scores[1]}`;
-            if(msg)msg.textContent=TORCH?`Player ${w+1} lit the big torch first and receives the GOLD MEDAL!`:`Player ${w+1} reached the finish first and receives the GOLD MEDAL!`;
+            if(msg)msg.textContent=TORCH?`Player ${w+1} lit the big torch first and receives a 1/11 medal!`:`Player ${w+1} reached the finish first and receives a 1/11 medal!`;
           }catch(e){}
         },120),{once:true});
       }));
