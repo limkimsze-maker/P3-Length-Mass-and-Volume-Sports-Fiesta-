@@ -27,28 +27,31 @@
     return 1;
   }
 
-  function arr(name) {
-    try {
-      return (0, eval)(`typeof ${name} !== 'undefined' && Array.isArray(${name}) ? ${name} : null`);
-    } catch (_) {
-      return null;
-    }
+  function accuracyScores() {
+    try { if (typeof correctCounts !== 'undefined' && Array.isArray(correctCounts)) return correctCounts; } catch (_) {}
+    try { if (typeof corrects !== 'undefined' && Array.isArray(corrects)) return corrects; } catch (_) {}
+    try { if (typeof scores !== 'undefined' && Array.isArray(scores)) return scores; } catch (_) {}
+    return null;
   }
 
-  function num(name) {
-    try {
-      const v = (0, eval)(`typeof ${name} !== 'undefined' ? ${name} : null`);
-      const n = Number(v);
-      return Number.isFinite(n) ? n : null;
-    } catch (_) {
-      return null;
-    }
+  function competitionScores() {
+    try { if (typeof scores !== 'undefined' && Array.isArray(scores)) return scores; } catch (_) {}
+    try { if (typeof distances !== 'undefined' && Array.isArray(distances)) return distances; } catch (_) {}
+    return accuracyScores();
+  }
+
+  function questionTotal() {
+    try { if (typeof TOTAL !== 'undefined' && Number.isFinite(Number(TOTAL))) return Number(TOTAL); } catch (_) {}
+    try { if (typeof N !== 'undefined' && Number.isFinite(Number(N))) return Number(N); } catch (_) {}
+    try { if (typeof MAX_TURNS !== 'undefined' && Number.isFinite(Number(MAX_TURNS))) return Number(MAX_TURNS); } catch (_) {}
+    try { if (typeof totalQuestions !== 'undefined' && Number.isFinite(Number(totalQuestions))) return Number(totalQuestions); } catch (_) {}
+    return null;
   }
 
   function readState(gm) {
-    const accuracy = arr('correctCounts') || arr('corrects') || arr('scores');
-    const competition = arr('scores') || arr('distances') || accuracy;
-    const total = num('TOTAL') ?? num('N') ?? num('MAX_TURNS') ?? num('totalQuestions');
+    const accuracy = accuracyScores();
+    const competition = competitionScores();
+    const total = questionTotal();
 
     let p1 = accuracy && Number.isFinite(Number(accuracy[0])) ? Number(accuracy[0]) : null;
     let p2 = accuracy && Number.isFinite(Number(accuracy[1])) ? Number(accuracy[1]) : null;
@@ -88,7 +91,7 @@
 
   function qualifiesOldRecord(x) {
     if (!x) return false;
-    if (x.awardRules === 'v4-medal-only') return x.pieceEarned === true;
+    if (x.awardRules === 'v4-medal-only' || ['v1','v2','v3'].includes(x.awardRules)) return x.pieceEarned === true;
     const oldWinner = x.lastWinner;
     const winnerQualified =
       Number(x.lastMode) === 2 &&
