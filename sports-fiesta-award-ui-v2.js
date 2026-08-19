@@ -10,10 +10,15 @@
     return lm === 2 && (lw === 'p1' || lw === 'p2' || Number(lw) === 1 || Number(lw) === 2 || lw === 'tie');
   }
 
+  function awardWinnerQualified(x) {
+    const lw = x?.lastAwardWinner;
+    return lw === 'p1' || lw === 'p2' || lw === 'tie' || Number(lw) === 1 || Number(lw) === 2;
+  }
+
   function recordQualified(x) {
     if (!x || typeof x !== 'object') return false;
-    if (x.awardRules === 'v1' || x.awardRules === 'v2' || x.awardRules === 'v3') return x.pieceEarned === true;
-    return x.perfectSingle === true || winnerQualified(x);
+    return x.perfectSingle === true || winnerQualified(x) || awardWinnerQualified(x) ||
+      (x.awardQualified === true && x.pieceEarned === true);
   }
 
   function readData() {
@@ -28,13 +33,14 @@
     for (let i = 1; i <= 11; i++) {
       const x = d[i];
       if (!x || typeof x !== 'object') continue;
-      if (x.awardRules === 'v1' || x.awardRules === 'v2' || x.awardRules === 'v3') continue;
-      const qualified = x.perfectSingle === true || winnerQualified(x);
-      x.pieceEarned = qualified;
-      x.awardQualified = qualified;
-      x.awardRules = 'v3';
-      d[i] = x;
-      changed = true;
+      const qualified = recordQualified(x);
+      if (x.pieceEarned !== qualified || x.awardQualified !== qualified || x.awardRules !== 'v4-medal-only') {
+        x.pieceEarned = qualified;
+        x.awardQualified = qualified;
+        x.awardRules = 'v4-medal-only';
+        d[i] = x;
+        changed = true;
+      }
     }
     if (changed) {
       localStorage.setItem(KEY, JSON.stringify(d));
@@ -74,7 +80,7 @@
     if (!latest) return 'p1';
     const lm = Number(latest.x.lastMode);
     const lw = latest.x.lastAwardWinner ?? latest.x.lastWinner;
-    if (lm === 1) return 'p1';
+    if (lm === 1 && !awardWinnerQualified(latest.x)) return 'p1';
     if (lw === 'tie') return 'tie';
     if (Number(lw) === 2 || lw === 'p2') return 'p2';
     return 'p1';
@@ -188,7 +194,7 @@
 
   function installRecordOverride() {
     if (!window.SportsFiestaAward || typeof window.SportsFiestaAward.record !== 'function') return false;
-    if (window.SportsFiestaAward.record.__awardRulesV3) return true;
+    if (window.SportsFiestaAward.record.__awardRulesV4) return true;
 
     const record = function(id, mode, winner, perfect) {
       id = Number(id); mode = Number(mode) || 1;
@@ -209,7 +215,7 @@
         perfectSingle: !!old.perfectSingle || (mode === 1 && !!perfect),
         verified: true,
         source: 'game-v5',
-        awardRules: 'v3',
+        awardRules: 'v4-medal-only',
         updatedAt: new Date().toISOString(),
         lastMode: mode,
         lastWinner: mode === 2 ? (isTie ? 'tie' : winnerNum) : (old.lastWinner ?? 0),
@@ -230,7 +236,7 @@
       }
     };
 
-    record.__awardRulesV3 = true;
+    record.__awardRulesV4 = true;
     window.SportsFiestaAward.record = record;
     return true;
   }
