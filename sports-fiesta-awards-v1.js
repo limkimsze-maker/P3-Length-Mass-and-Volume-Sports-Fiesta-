@@ -1,10 +1,10 @@
-/* SPORTS FIESTA AWARD RULES V1 — awards only; does not alter gameplay */
+/* SPORTS FIESTA AWARD RULES V2 — 1/11 lesson medals; ties award both players */
 (() => {
   const script = document.currentScript;
   const ID = Number(script?.dataset?.practice || 0);
   const SPORT = script?.dataset?.sport || `Practice ${ID}`;
-  if (!ID || window[`__sportsFiestaAwardsV1_${ID}`]) return;
-  window[`__sportsFiestaAwardsV1_${ID}`] = true;
+  if (!ID || window[`__sportsFiestaAwardsV2_${ID}`]) return;
+  window[`__sportsFiestaAwardsV2_${ID}`] = true;
 
   const KEY = 'sportsFiestaHubProgress_v1';
   const HUB = 'https://limkimsze-maker.github.io/P3-Length-Mass-and-Volume-Sports-Fiesta-/';
@@ -105,7 +105,7 @@
   function oldWinnerQualified(old) {
     const lm = Number(old.lastMode);
     const lw = old.lastWinner;
-    const winner = lw === 'p1' || lw === 'p2' || Number(lw) === 1 || Number(lw) === 2;
+    const winner = lw === 'p1' || lw === 'p2' || lw === 'tie' || Number(lw) === 1 || Number(lw) === 2;
     return lm === 2 && winner;
   }
 
@@ -113,9 +113,10 @@
     let data = {};
     try { data = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (_) {}
     const old = data[ID] || {};
-    const priorQualified = old.awardRules === 'v1' ? !!old.pieceEarned : (!!old.perfectSingle || oldWinnerQualified(old));
+    const priorQualified = ['v1','v2','v3'].includes(old.awardRules) ? !!old.pieceEarned : (!!old.perfectSingle || oldWinnerQualified(old));
+    const isTie = gm === 2 && o.winner === 'tie';
     const winnerNum = o.winner === 'p1' ? 1 : o.winner === 'p2' ? 2 : 0;
-    const qualifies = gm === 1 ? !!o.perfect : winnerNum > 0;
+    const qualifies = gm === 1 ? !!o.perfect : (winnerNum > 0 || isTie);
     const pieceEarned = priorQualified || qualifies;
     const perfectSingle = !!old.perfectSingle || (gm === 1 && !!o.perfect);
 
@@ -127,30 +128,29 @@
       perfectSingle,
       verified: true,
       source: 'game-v5',
-      awardRules: 'v1',
+      awardRules: 'v3',
       updatedAt: new Date().toISOString(),
       lastMode: gm,
-      lastWinner: gm === 2 ? winnerNum : (old.lastWinner ?? 0),
-      lastAwardWinner: qualifies ? (gm === 1 ? 1 : winnerNum) : (old.lastAwardWinner ?? 0)
+      lastWinner: gm === 2 ? (isTie ? 'tie' : winnerNum) : (old.lastWinner ?? 0),
+      lastAwardWinner: qualifies ? (gm === 1 ? 1 : (isTie ? 'tie' : winnerNum)) : (old.lastAwardWinner ?? 0)
     };
     localStorage.setItem(KEY, JSON.stringify(data));
 
-    let perfectCount = 0, pieces = 0;
+    let pieces = 0;
     for (let i = 1; i <= 11; i++) {
       const x = data[i] || {};
       const verified = x.completed === true && x.verified === true && x.source === 'game-v5';
-      if (verified && x.perfectSingle === true) perfectCount++;
       if (verified && x.pieceEarned === true) pieces++;
     }
-    return { perfectCount, pieces, qualifies };
+    return { pieces, qualifies };
   }
 
   function showCeremony(gm, o, progress) {
     const winner = gm === 1 ? 'p1' : o.winner;
-    const fullGold = gm === 1 && o.perfect && progress.perfectCount === 11;
+    const fullGold = progress.pieces === 11;
     const frame = document.createElement('iframe');
     frame.title = 'Sports Fiesta medal ceremony';
-    frame.src = HUB + '?ceremonyBridge=award-v1&t=' + Date.now();
+    frame.src = HUB + '?ceremonyBridge=award-v2&t=' + Date.now();
     Object.assign(frame.style, {
       position: 'fixed', inset: '0', width: '100%', height: '100%', border: '0',
       zIndex: '2147483647', background: '#185b9d'
@@ -170,15 +170,17 @@
           w.showMedalCeremony(false, winner, 'piece');
           const sub = d.getElementById('mcSub'), msg = d.getElementById('mcMessage');
           if (sub) sub.textContent = `Practice ${ID} of 11 • ${SPORT}`;
-          if (msg) msg.textContent = gm === 1
-            ? `Player 1 earns 1/11 of the medal for a perfect score!`
-            : `${winner === 'p2' ? 'Player 2' : 'Player 1'} earns 1/11 of the medal for winning!`;
+          if (msg) {
+            if (gm === 1) msg.textContent = 'Player 1 earns a 1/11 medal for a perfect score!';
+            else if (winner === 'tie') msg.textContent = 'It is a tie! Player 1 and Player 2 both receive a 1/11 medal on the rostrum!';
+            else msg.textContent = `${winner === 'p2' ? 'Player 2' : 'Player 1'} wins and earns a 1/11 medal!`;
+          }
         };
         const showGold = () => {
           stage = 'gold';
           w.showMedalCeremony(false, 'p1', 'gold');
           const sub = d.getElementById('mcSub'), msg = d.getElementById('mcMessage');
-          if (sub) sub.textContent = 'All 11 lessons completed perfectly by Player 1!';
+          if (sub) sub.textContent = 'All 11 Sports Fiesta lessons completed!';
           if (msg) msg.textContent = '🏆 Player 1 receives the Sports Fiesta GOLD MEDAL! 🏆';
         };
 
@@ -209,7 +211,7 @@
       if (gm === 2 && !isTwoPlayerFinal(res, text, o)) return;
       const progress = save(gm, o);
       shown = true;
-      if (!progress.qualifies) return; // 1P non-perfect and 2P tie: no medal piece.
+      if (!progress.qualifies) return; // 1P non-perfect: no lesson medal.
       setTimeout(() => showCeremony(gm, o, progress), 300);
     }, 120);
   }
