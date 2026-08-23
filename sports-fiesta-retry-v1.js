@@ -106,19 +106,48 @@
   });
 
   // For turn-taking games (Practices 2–11), equal turns are already built into the games.
-  // The fair winner is therefore the player who made fewer wrong attempts.
+  // Most practices use fewer mistakes as the fair-play tiebreak/result rule.
+  // Practice 11 already tracks each player's correct-answer score directly, so its
+  // displayed winner must come from those scores and must not be overwritten by mistake counts.
   function applyFairTurnTakingResult(){
     if(practice===1 || getMode()!==2 || fairResultApplied) return;
     const results=document.getElementById('results');
     if(!results || !results.classList.contains('active')) return;
+
+    const title=document.getElementById('resultTitle') || document.getElementById('rt');
+    const text=document.getElementById('resultText') || document.getElementById('rr');
+
+    if(practice===11){
+      let a=null,b=null;
+      try{
+        if(typeof scores!=='undefined' && Array.isArray(scores)){
+          a=Number(scores[0]);
+          b=Number(scores[1]);
+        }
+      }catch(_){}
+
+      if(Number.isFinite(a) && Number.isFinite(b)){
+        fairResultApplied=true;
+        const winner=a===b?'tie':(a>b?'p1':'p2');
+        window.__sportsFiestaFairWinner=winner;
+        if(title){
+          title.textContent=winner==='tie' ? "It's a Tie!" : `Player ${winner==='p2'?2:1} Wins the Relay!`;
+        }
+        if(text){
+          text.innerHTML=`Player 1 correct answers: <b>${a}</b><br>Player 2 correct answers: <b>${b}</b><br><br>`+
+            (winner==='tie'
+              ? 'Both players have the same number of correct answers.'
+              : `Player ${winner==='p2'?2:1} has more correct answers and wins the relay.`);
+        }
+        return;
+      }
+    }
 
     fairResultApplied=true;
     const m1=Number(mistakes[0])||0, m2=Number(mistakes[1])||0;
     const winner=m1===m2?'tie':(m1<m2?'p1':'p2');
     window.__sportsFiestaFairWinner=winner;
 
-    const title=document.getElementById('resultTitle') || document.getElementById('rt');
-    const text=document.getElementById('resultText') || document.getElementById('rr');
     if(title){
       title.textContent=winner==='tie' ? "It's a Tie!" : `Player ${winner==='p2'?2:1} Wins!`;
     }
