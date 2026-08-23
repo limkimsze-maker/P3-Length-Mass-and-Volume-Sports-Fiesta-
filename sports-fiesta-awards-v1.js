@@ -327,12 +327,47 @@
     };
   }
 
+  function addCeremonyNextButton(gm, outcome, progress) {
+    const result = document.getElementById('results');
+    if (!result || !progress.qualifies) return;
+
+    let btn = document.getElementById('sfCeremonyNext');
+    if (!btn) {
+      btn = document.createElement('button');
+      btn.id = 'sfCeremonyNext';
+      btn.type = 'button';
+      btn.textContent = 'Next →';
+      btn.setAttribute('aria-label', 'Next to medal ceremony');
+      btn.className = 'bigbtn gold';
+      Object.assign(btn.style, {
+        minWidth:'150px',
+        margin:'14px auto 4px',
+        display:'block',
+        fontWeight:'900',
+        fontSize:'20px'
+      });
+
+      const box = result.querySelector('.results') || result;
+      const firstButton = box.querySelector('button');
+      if (firstButton) box.insertBefore(btn, firstButton);
+      else box.appendChild(btn);
+    }
+
+    btn.disabled = false;
+    btn.onclick = () => {
+      btn.disabled = true;
+      showCeremony(gm, outcome, progress);
+    };
+  }
+
   function checkResult() {
     clearTimeout(timer);
     timer = setTimeout(() => {
       const result = document.getElementById('results');
       if (!visible(result)) {
         handledResult = false;
+        const oldBtn = document.getElementById('sfCeremonyNext');
+        if (oldBtn) oldBtn.remove();
         return;
       }
       if (handledResult) return;
@@ -342,8 +377,9 @@
       const progress = updateProgress(gm, outcome);
       handledResult = true;
 
-      if (!progress.qualifies) return;
-      setTimeout(() => showCeremony(gm, outcome, progress), 350);
+      // Keep the result/attempt record on screen. The ceremony starts only when
+      // the players deliberately press Next.
+      addCeremonyNextButton(gm, outcome, progress);
     }, 220);
   }
 
