@@ -3,6 +3,53 @@
   if (window.__sportsFiestaPreviewAwardBridgeV2) return;
   window.__sportsFiestaPreviewAwardBridgeV2 = true;
 
+  /* The hub's hardened completion reader accepts the historical compatibility
+     source "game-v5". Current verified 1-player completions are produced by the
+     shared result bridge, so reconcile those trusted records before rendering.
+     Keep the true producer in bridgeSource for debugging/auditing. */
+  const HUB_PROGRESS_KEY = 'sportsFiestaHubProgress_v1';
+  const TRUSTED_CURRENT_SOURCES = new Set([
+    'game-v9-preview-bridge',
+    'game-v10-shared-result-flow'
+  ]);
+
+  function reconcileHubProgress() {
+    try {
+      const raw = localStorage.getItem(HUB_PROGRESS_KEY);
+      if (!raw) return false;
+      const data = JSON.parse(raw) || {};
+      let changed = false;
+      for (let i = 1; i <= 11; i++) {
+        const rec = data[i];
+        if (!rec || rec.completed !== true || rec.verified !== true) continue;
+        const perfect = rec.perfectSingle === true || rec.singlePlayerPerfect === true;
+        if (!perfect || !TRUSTED_CURRENT_SOURCES.has(rec.source)) continue;
+        rec.bridgeSource = rec.source;
+        rec.source = 'game-v5';
+        changed = true;
+      }
+      if (!changed) return false;
+      localStorage.setItem(HUB_PROGRESS_KEY, JSON.stringify(data));
+      if (typeof window.renderAll === 'function') window.renderAll();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  reconcileHubProgress();
+  setTimeout(reconcileHubProgress, 0);
+  setTimeout(reconcileHubProgress, 500);
+  window.addEventListener('storage', e => {
+    if (e.key === HUB_PROGRESS_KEY) reconcileHubProgress();
+  });
+  window.addEventListener('focus', reconcileHubProgress);
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) reconcileHubProgress();
+  });
+  /* Covers same-document practice screens where a storage event is not fired. */
+  setInterval(reconcileHubProgress, 750);
+
   const base = window.showMedalCeremony;
   if (typeof base !== 'function') return;
 
