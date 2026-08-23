@@ -1,4 +1,4 @@
-/* Sports Fiesta result bridge — games choose the result; hub preview supplies the animation */
+/* Sports Fiesta result bridge — shared real result/progress/award flow + teacher DEBUG */
 (() => {
   const script = document.currentScript;
   const PRACTICE_ID = Number(script?.dataset?.practice || 0);
@@ -8,6 +8,7 @@
 
   const HUB_KEY = 'sportsFiestaHubProgress_v1';
   const HUB_URL = 'https://limkimsze-maker.github.io/P3-Length-Mass-and-Volume-Sports-Fiesta-/';
+  const DEBUG_PASS = '67';
 
   /* Keep the two small practice-specific presentation fixes. */
   if (PRACTICE_ID === 10 && typeof window.markerStripSVG === 'function') {
@@ -48,7 +49,7 @@
   }
 
   const retryScript = document.createElement('script');
-  retryScript.src = HUB_URL + 'sports-fiesta-retry-v1.js?v=20260823f';
+  retryScript.src = HUB_URL + 'sports-fiesta-retry-v1.js?v=20260823debugv6';
   retryScript.dataset.practice = String(PRACTICE_ID);
   retryScript.async = false;
   document.head.appendChild(retryScript);
@@ -194,7 +195,7 @@
         pieceEarned:nowPerfect,
         awardQualified:nowPerfect,
         verified:true,
-        source:'game-v9-preview-bridge',
+        source:'game-v10-shared-result-flow',
         awardRules:'single-vs-duel-separated',
         updatedAt:new Date().toISOString(),
         lastMode:1
@@ -236,6 +237,12 @@
     } catch (_) {}
   }
 
+  function winnerMessage(winner) {
+    if (winner === 'p2') return 'Well done, Player 2.';
+    if (winner === 'tie') return 'Well done, both players!';
+    return 'Well done, Player 1.';
+  }
+
   function fillResultText(d, gm, winner, stats) {
     const banner = d.querySelector('#medalCeremony .mc-banner');
     const sub = d.getElementById('mcSub');
@@ -248,23 +255,25 @@
 
     if (!msg) return;
     if (gm === 1) {
-      msg.textContent = 'Perfect score! Player 1 earns a 1/11 gold medal piece!';
+      msg.innerHTML = `<b>Well done, Player 1.</b><br>Perfect score! Player 1 earns a 1/11 gold medal piece!`;
       return;
     }
 
-    const title = winner === 'tie' ? "It's a tie! Both players share 1st place!" : `${winner === 'p2' ? 'Player 2' : 'Player 1'} wins and earns the 1/11 gold medal piece!`;
+    const well = winnerMessage(winner);
     if (!stats) {
-      msg.textContent = title;
+      msg.textContent = well;
       return;
     }
-    msg.innerHTML = `<b>${title}</b><br>Player 1 — Correct: ${stats.c1} | Wrong: ${stats.w1}<br>Player 2 — Correct: ${stats.c2} | Wrong: ${stats.w2}`;
+    msg.innerHTML = `<b>${well}</b><br>Player 1 — Correct: ${stats.c1} | Wrong: ${stats.w1}<br>Player 2 — Correct: ${stats.c2} | Wrong: ${stats.w2}`;
   }
 
   function showCeremony(gm, outcome, progress) {
     const winner = gm === 1 ? 'p1' : outcome.winner;
     const stats = attemptStats();
     const frame = document.createElement('iframe');
-    frame.title = 'Sports Fiesta medal ceremony';
+    /* The retry controller intentionally holds only the exact 2-player title until
+       its normal Next button capture hook runs. 1-player must not be hidden. */
+    frame.title = gm === 2 ? 'Sports Fiesta medal ceremony' : 'Sports Fiesta 1-player medal ceremony';
     frame.src = HUB_URL + '?ceremonyBridge=award-v8&mode=' + gm + '&winner=' + encodeURIComponent(winner) + '&t=' + Date.now();
     Object.assign(frame.style, {
       position:'fixed', inset:'0', width:'100%', height:'100%', border:'0',
@@ -296,10 +305,8 @@
           fillResultText(d, gm, winner, stats);
         };
 
-        /* Always fetch the small bridge with a fresh version. It does not redraw
-           the ceremony; it only routes P1/P2/tie to the original preview. */
         const fresh = d.createElement('script');
-        fresh.src = HUB_URL + 'sports-fiesta-award-ui-v2.js?v=20260823previewrestore1';
+        fresh.src = HUB_URL + 'sports-fiesta-award-ui-v2.js?v=20260823debugv6';
         fresh.onload = playPiece;
         fresh.onerror = playPiece;
         d.head.appendChild(fresh);
@@ -332,145 +339,6 @@
     };
   }
 
-  /* SF_FLOW_CHEAT_V2 — full result screen then the real ceremony. */
-  function cheatStats(kind, total) {
-    if (kind === 'single') return {correct:[total,0], wrong:[0,0]};
-    if (kind === 'p1') return {correct:[10,7], wrong:[0,3]};
-    if (kind === 'p2') return {correct:[7,10], wrong:[3,0]};
-    return {correct:[8,8], wrong:[2,2]};
-  }
-
-  function cheatCopy(kind, total) {
-    if (kind === 'p1') return {title:'Player 1 Wins!', well:'Well done, Player 1.', scores:'Player 1 — Correct: 10 | Wrong: 0<br>Player 2 — Correct: 7 | Wrong: 3'};
-    if (kind === 'p2') return {title:'Player 2 Wins!', well:'Well done, Player 2.', scores:'Player 1 — Correct: 7 | Wrong: 3<br>Player 2 — Correct: 10 | Wrong: 0'};
-    if (kind === 'tie') return {title:'It’s a Tie!', well:'Well done, both players!', scores:'Player 1 — Correct: 8 | Wrong: 2<br>Player 2 — Correct: 8 | Wrong: 2'};
-    return {title:'Practice Complete!', well:'Well done, Player 1.', scores:`Player 1 — Correct: ${total} | Wrong: 0`};
-  }
-
-  function restoreCheatStats(fake, previousStats) {
-    if (window.__sportsFiestaAttemptStats !== fake) return;
-    if (previousStats == null) delete window.__sportsFiestaAttemptStats;
-    else window.__sportsFiestaAttemptStats = previousStats;
-  }
-
-  function showCheatResult(kind, gm, outcome, progress, fake, previousStats, total) {
-    document.getElementById('sfCheatFlowResultV2')?.remove();
-    const copy = cheatCopy(kind, total);
-    const overlay = document.createElement('div');
-    overlay.id = 'sfCheatFlowResultV2';
-    Object.assign(overlay.style, {
-      position:'fixed', inset:'0', zIndex:'2147483646', display:'flex',
-      alignItems:'center', justifyContent:'center', padding:'18px',
-      background:'rgba(12,42,75,.86)', backdropFilter:'blur(5px)',
-      fontFamily:'Trebuchet MS,Arial,sans-serif'
-    });
-    overlay.innerHTML = `
-      <div style="width:min(520px,94vw);background:#fff;color:#17324d;border:5px solid #d9ecff;border-radius:26px;padding:24px;text-align:center;box-shadow:0 24px 70px rgba(0,0,0,.32)">
-        <div style="font-size:13px;font-weight:900;color:#6d35c7;margin-bottom:8px">🧪 FLOW TEST • PRACTICE ${PRACTICE_ID}</div>
-        <div style="font-size:clamp(28px,6vw,42px);font-weight:1000;margin:4px 0 8px">${copy.title}</div>
-        <div style="font-size:20px;font-weight:1000;color:#267044;margin-bottom:14px">${copy.well}</div>
-        <div style="font-size:17px;font-weight:800;line-height:1.65;background:#f4f8fc;border-radius:16px;padding:13px 15px;margin:0 auto 18px">${copy.scores}</div>
-        <button id="sfCheatFlowNextV2" type="button" style="min-width:170px;border:0;border-radius:15px;padding:13px 22px;background:#f4c542;color:#4b3700;font-size:20px;font-weight:1000;cursor:pointer;box-shadow:0 5px 0 #c99d22">Next →</button>
-      </div>`;
-    document.body.appendChild(overlay);
-
-    const next = overlay.querySelector('#sfCheatFlowNextV2');
-    next.onclick = () => {
-      next.disabled = true;
-      overlay.remove();
-      showCeremony(gm, outcome, progress);
-      setTimeout(() => restoreCheatStats(fake, previousStats), 0);
-    };
-  }
-
-  function cheatFinish(kind) {
-    if (!['single','p1','p2','tie'].includes(kind)) return;
-    if (document.querySelector('iframe[title="Sports Fiesta medal ceremony"]')) return;
-
-    const total = Math.max(1, Number(questionTotal()) || 12);
-    const fake = cheatStats(kind, total);
-    const previousStats = window.__sportsFiestaAttemptStats;
-    window.__sportsFiestaAttemptStats = fake;
-
-    let gm, outcome;
-    if (kind === 'single') {
-      gm = 1;
-      outcome = {winner:'p1', perfect:true, score:total, total};
-    } else {
-      gm = 2;
-      outcome = {winner:kind, perfect:false};
-    }
-
-    handledResult = true;
-    const progress = updateProgress(gm, outcome);
-    showCheatResult(kind, gm, outcome, progress, fake, previousStats, total);
-  }
-  window.__sportsFiestaCheatFinish = cheatFinish;
-
-  function installFlowCheatPanel() {
-    if (document.getElementById('sfFlowCheatPanel')) return;
-
-    const style = document.createElement('style');
-    style.id = 'sfFlowCheatStyle';
-    style.textContent = `
-      #sfFlowCheatPanel{position:fixed;right:12px;bottom:12px;z-index:2147483000;font-family:"Trebuchet MS",Arial,sans-serif;text-align:left}
-      #sfFlowCheatToggle{border:2px solid #fff;border-radius:999px;padding:9px 13px;background:#6d35c7;color:#fff;font-weight:1000;font-size:13px;box-shadow:0 5px 16px rgba(0,0,0,.28);cursor:pointer}
-      #sfFlowCheatMenu{display:none;width:min(268px,88vw);margin-top:8px;padding:12px;border:3px solid #d8c8ff;border-radius:17px;background:rgba(255,255,255,.98);box-shadow:0 12px 30px rgba(0,0,0,.28)}
-      #sfFlowCheatPanel.open #sfFlowCheatMenu{display:block}
-      #sfFlowCheatMenu strong{display:block;color:#4c268d;font-size:14px;margin-bottom:7px;text-align:center}
-      #sfFlowCheatMenu button{display:block;width:100%;margin:6px 0;border:0;border-radius:11px;padding:9px 10px;font-size:13px;font-weight:1000;cursor:pointer;box-shadow:0 3px 0 rgba(0,0,0,.14)}
-      #sfFlowCheatMenu button[data-sf-cheat="single"]{background:#ffe272;color:#5d4300}
-      #sfFlowCheatMenu button[data-sf-cheat="p1"]{background:#dcecff;color:#144e88}
-      #sfFlowCheatMenu button[data-sf-cheat="p2"]{background:#ffe0e5;color:#8b2638}
-      #sfFlowCheatMenu button[data-sf-cheat="tie"]{background:#e6f7e8;color:#246b31}
-      #sfFlowCheatMenu small{display:block;margin-top:8px;color:#667788;font-size:10px;line-height:1.3;text-align:center}
-      @media(max-width:600px){#sfFlowCheatPanel{right:7px;bottom:7px}#sfFlowCheatToggle{padding:7px 10px;font-size:11px}#sfFlowCheatMenu{width:min(235px,86vw);padding:9px}#sfFlowCheatMenu button{padding:7px 8px;font-size:11px;margin:5px 0}}
-    `;
-    document.head.appendChild(style);
-
-    const panel = document.createElement('div');
-    panel.id = 'sfFlowCheatPanel';
-    panel.innerHTML = `
-      <button id="sfFlowCheatToggle" type="button" aria-expanded="false">🧪 CHEAT SOLVE</button>
-      <div id="sfFlowCheatMenu">
-        <strong>FLOW TEST • PRACTICE ${PRACTICE_ID}</strong>
-        <button type="button" data-sf-cheat="single">👤 1 Player — P1 Perfect</button>
-        <button type="button" data-sf-cheat="p1">🔵 2 Players — P1 Wins</button>
-        <button type="button" data-sf-cheat="p2">🔴 2 Players — P2 Wins</button>
-        <button type="button" data-sf-cheat="tie">🤝 2 Players — Tie</button>
-        <small>Testing uses the real saved progress + award flow. The 1-player button records this practice as perfectly completed.</small>
-      </div>`;
-    document.body.appendChild(panel);
-
-    const toggle = panel.querySelector('#sfFlowCheatToggle');
-    toggle.addEventListener('click', () => {
-      const open = panel.classList.toggle('open');
-      toggle.setAttribute('aria-expanded', String(open));
-    });
-
-    /* Capture the test outcome in this same practice document before any cover-level
-       preview helper can intercept it. */
-    if (!window.__sfAwardCheatCaptureV2) {
-      window.__sfAwardCheatCaptureV2 = true;
-      document.addEventListener('click', e => {
-        const btn = e.target.closest?.('#sfFlowCheatPanel [data-sf-cheat]');
-        if (!btn) return;
-        e.preventDefault();
-        e.stopPropagation();
-        e.stopImmediatePropagation();
-        panel.classList.remove('open');
-        toggle.setAttribute('aria-expanded','false');
-        cheatFinish(btn.dataset.sfCheat);
-      }, true);
-    }
-  }
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', installFlowCheatPanel, {once:true});
-  } else {
-    installFlowCheatPanel();
-  }
-
   function addCeremonyNextButton(gm, outcome, progress) {
     const result = document.getElementById('results');
     if (!result || !progress.qualifies) return;
@@ -494,6 +362,156 @@
     };
   }
 
+  /* DEBUG only skips answering. It then uses the same updateProgress(), Results
+     screen, Next button and showCeremony() functions as genuine completion. */
+  function debugStats(kind, total) {
+    if (kind === 'single') return {correct:[total,0], wrong:[0,0]};
+    if (kind === 'p1') return {correct:[10,7], wrong:[0,3]};
+    if (kind === 'p2') return {correct:[7,10], wrong:[3,0]};
+    return {correct:[8,8], wrong:[2,2]};
+  }
+
+  function resultParts(result) {
+    let title = document.getElementById('resultTitle') || document.getElementById('rt');
+    let text = document.getElementById('resultText') || document.getElementById('rr');
+    let summary = document.getElementById('sfDebugResultSummaryV6');
+    if (!summary) {
+      summary = document.createElement('div');
+      summary.id = 'sfDebugResultSummaryV6';
+      summary.style.cssText = 'max-width:680px;margin:14px auto;padding:14px 18px;border-radius:16px;background:#f4f8fc;color:#17324d;font-weight:800;line-height:1.55;text-align:center;';
+      const box = result.querySelector('.results') || result;
+      box.insertBefore(summary, box.firstChild || null);
+    }
+    return {title,text,summary};
+  }
+
+  function activateResults(result) {
+    document.querySelectorAll('.screen.active,.page.active,.view.active').forEach(el => {
+      if (el !== result) el.classList.remove('active');
+    });
+    result.style.removeProperty('display');
+    result.style.removeProperty('visibility');
+    result.classList.add('active');
+  }
+
+  function runDebugFastForward(kind) {
+    const gm = getMode();
+    if (gm === 1) kind = 'single';
+    if (gm === 2 && !['p1','p2','tie'].includes(kind)) return;
+
+    const result = document.getElementById('results');
+    if (!result) {
+      alert('DEBUG could not find this practice’s normal Results screen.');
+      return;
+    }
+
+    const total = Math.max(1, Number(questionTotal()) || 12);
+    const fake = debugStats(kind, total);
+    window.__sportsFiestaAttemptStats = fake;
+    if (gm === 2) window.__sportsFiestaFairWinner = kind;
+
+    const {title,text,summary} = resultParts(result);
+    if (gm === 1) {
+      if (title) title.textContent = 'Perfect Score!';
+      if (text) text.innerHTML = `<b>Player 1 — Correct: ${total} / ${total}</b><br>Perfect score!`;
+      summary.innerHTML = `<b>Player 1 — Correct: ${total} / ${total}</b><br>Perfect score!`;
+    } else {
+      const label = kind === 'tie' ? "It's a Tie!" : `Player ${kind === 'p2' ? 2 : 1} Wins!`;
+      if (title) title.textContent = PRACTICE_ID === 1 && kind !== 'tie' ? `Player ${kind === 'p2' ? 2 : 1} Wins the Race!` : label;
+      const scoresHtml = `Player 1 — Correct: <b>${fake.correct[0]}</b> &nbsp; Wrong: <b>${fake.wrong[0]}</b><br>Player 2 — Correct: <b>${fake.correct[1]}</b> &nbsp; Wrong: <b>${fake.wrong[1]}</b>`;
+      if (text) text.innerHTML = `<b>Attempt record</b><br>${scoresHtml}`;
+      summary.innerHTML = `<b>${label}</b><br>${scoresHtml}`;
+    }
+
+    document.getElementById('sfCeremonyNext')?.remove();
+    document.getElementById('sfCeremonyNextWrap')?.remove();
+    activateResults(result);
+
+    const outcome = gm === 1
+      ? {winner:'p1', perfect:true, score:total, total}
+      : {winner:kind, perfect:false};
+
+    handledResult = true;
+    const progress = updateProgress(gm, outcome);
+    addCeremonyNextButton(gm, outcome, progress);
+
+    if (gm === 2) {
+      [0,80,180,350].forEach(ms => setTimeout(() => { window.__sportsFiestaFairWinner = kind; }, ms));
+    }
+  }
+  window.__sportsFiestaDebugFastForwardV6 = runDebugFastForward;
+
+  function installDebugPanel() {
+    document.getElementById('sfFlowCheatPanel')?.remove();
+    if (document.getElementById('sfDebugPanelV6')) return;
+
+    const style = document.createElement('style');
+    style.id = 'sfDebugStyleV6';
+    style.textContent = `
+      #sfDebugPanelV6{position:fixed;right:12px;bottom:12px;z-index:2147483003;font-family:"Trebuchet MS",Arial,sans-serif;display:flex;gap:7px;align-items:flex-end;justify-content:flex-end;flex-wrap:wrap;max-width:min(700px,95vw)}
+      #sfDebugPanelV6 button{border:2px solid #fff;border-radius:13px;padding:9px 12px;font-size:12px;font-weight:1000;cursor:pointer;box-shadow:0 5px 16px rgba(0,0,0,.25)}
+      #sfDebugUnlockV6{background:#5c2aa6;color:#fff;border-radius:999px!important}
+      #sfDebugChoicesV6{display:none;gap:7px;flex-wrap:wrap;justify-content:flex-end;background:rgba(255,255,255,.97);border:3px solid #d8c8ff;border-radius:16px;padding:8px}
+      #sfDebugPanelV6.unlocked #sfDebugChoicesV6{display:flex}#sfDebugPanelV6.unlocked #sfDebugUnlockV6{display:none}
+      .sfDebugSingleV6{background:#ffe272;color:#5d4300}.sfDebugP1V6{background:#dcecff;color:#144e88}.sfDebugP2V6{background:#ffe0e5;color:#8b2638}.sfDebugTieV6{background:#e6f7e8;color:#246b31}.sfDebugLockV6{background:#eef1f5;color:#53606d}
+      @media(max-width:600px){#sfDebugPanelV6{right:7px;bottom:7px}#sfDebugPanelV6 button{padding:7px 9px;font-size:10px}#sfDebugChoicesV6{gap:5px;padding:6px}}
+    `;
+    document.head.appendChild(style);
+
+    const panel = document.createElement('div');
+    panel.id = 'sfDebugPanelV6';
+    panel.innerHTML = `<button id="sfDebugUnlockV6" type="button">DEBUG</button><div id="sfDebugChoicesV6"></div>`;
+    document.body.appendChild(panel);
+
+    let unlocked = false;
+    let lastMode = getMode();
+    const choices = panel.querySelector('#sfDebugChoicesV6');
+    const render = () => {
+      if (!unlocked) {
+        panel.classList.remove('unlocked');
+        choices.innerHTML = '';
+        return;
+      }
+      panel.classList.add('unlocked');
+      if (getMode() === 2) {
+        choices.innerHTML = `<button class="sfDebugP1V6" data-sf-debug-v6="p1">Player 1 Wins</button><button class="sfDebugP2V6" data-sf-debug-v6="p2">Player 2 Wins</button><button class="sfDebugTieV6" data-sf-debug-v6="tie">Tie</button><button class="sfDebugLockV6" data-sf-debug-lock-v6>🔒</button>`;
+      } else {
+        choices.innerHTML = `<button class="sfDebugSingleV6" data-sf-debug-v6="single">Player 1 Cheat Solve</button><button class="sfDebugLockV6" data-sf-debug-lock-v6>🔒</button>`;
+      }
+    };
+
+    panel.querySelector('#sfDebugUnlockV6').onclick = () => {
+      const entered = prompt('DEBUG password');
+      if (entered === null) return;
+      if (entered !== DEBUG_PASS) {
+        alert('Incorrect password.');
+        return;
+      }
+      unlocked = true;
+      render();
+    };
+
+    choices.addEventListener('click', e => {
+      if (e.target.closest('[data-sf-debug-lock-v6]')) {
+        unlocked = false;
+        render();
+        return;
+      }
+      const btn = e.target.closest('[data-sf-debug-v6]');
+      if (btn) runDebugFastForward(btn.dataset.sfDebugV6);
+    });
+
+    setInterval(() => {
+      /* Old cached helper must never be allowed to recreate CHEAT SOLVE. */
+      document.getElementById('sfFlowCheatPanel')?.remove();
+      const now = getMode();
+      if (now !== lastMode) {
+        lastMode = now;
+        render();
+      }
+    }, 250);
+  }
+
   function checkResult() {
     clearTimeout(timer);
     timer = setTimeout(() => {
@@ -510,6 +528,12 @@
       handledResult = true;
       addCeremonyNextButton(gm, outcome, progress);
     }, 220);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', installDebugPanel, {once:true});
+  } else {
+    installDebugPanel();
   }
 
   new MutationObserver(checkResult).observe(document.documentElement, {
