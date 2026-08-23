@@ -211,17 +211,73 @@
 
   function ceremonyPlayerSources(d){const cards=[...d.querySelectorAll('.playerImgWrap img.playerSvg')];return {p1:d.getElementById('fcP1')?.src||cards[0]?.src||'',p2:d.getElementById('fcP2')?.src||cards[1]?.src||''}}
 
+  function ensureCeremonyFallbackStyle(d){
+    if(d.getElementById('sfStandaloneMatchStyle'))return;
+    const st=d.createElement('style');st.id='sfStandaloneMatchStyle';st.textContent=`
+      #medalCeremony #mcMessage.sf-match-result-card{background:#fff!important;color:#111!important;text-shadow:none!important;border:2px solid rgba(0,0,0,.10)!important;border-radius:18px!important;box-shadow:0 7px 20px rgba(0,0,0,.18)!important;width:min(760px,88%)!important;max-width:760px!important;padding:12px 18px!important;line-height:1.35!important;font-size:clamp(16px,2.2vw,22px)!important;text-align:center!important;}
+      #medalCeremony #mcMessage .sf-result-winner{display:block;font-size:1.22em;font-weight:1000;margin-bottom:5px;color:#111!important}
+      #medalCeremony #mcMessage .sf-result-note{display:block;font-size:.86em;font-weight:800;margin-bottom:6px;color:#333!important}
+      #medalCeremony #mcMessage .sf-result-line{display:block;font-size:.94em;font-weight:850;color:#111!important}
+      #medalCeremony .sf-tie-player{position:absolute!important;bottom:118px!important;width:min(190px,28%)!important;height:300px!important;object-fit:contain!important;z-index:4!important;}
+      #medalCeremony #mcPlayer.sf-tie-player{left:28%!important;transform:translateX(-50%)!important;animation:sfTieLeftIn .72s cubic-bezier(.22,.9,.3,1.15) both!important}
+      #medalCeremony #mcPlayer2.sf-tie-player{left:72%!important;transform:translateX(-50%)!important;display:block!important;animation:sfTieRightIn .72s .08s cubic-bezier(.22,.9,.3,1.15) both!important}
+      @keyframes sfTieLeftIn{from{opacity:0;transform:translateX(-50%) translateX(-90px) translateY(60px) scale(.82)}to{opacity:1;transform:translateX(-50%) translateX(0) translateY(0) scale(1)}}
+      @keyframes sfTieRightIn{from{opacity:0;transform:translateX(-50%) translateX(90px) translateY(60px) scale(.82)}to{opacity:1;transform:translateX(-50%) translateX(0) translateY(0) scale(1)}}
+      #medalCeremony .sf-first-ordinal::before{content:'1st'!important;font-size:.72em!important}
+      @media(max-width:620px){#medalCeremony .sf-tie-player{width:min(145px,39vw)!important;height:230px!important;bottom:110px!important}#medalCeremony #mcPlayer.sf-tie-player{left:25%!important}#medalCeremony #mcPlayer2.sf-tie-player{left:75%!important}#medalCeremony #mcMessage.sf-match-result-card{width:92%!important;padding:9px 11px!important;font-size:15px!important}}
+    `;d.head.appendChild(st);
+  }
+
+  function markFirstAsOrdinal(d){
+    const root=d.getElementById('medalCeremony');if(!root)return;
+    root.querySelectorAll('*').forEach(el=>{
+      if(!el.children.length&&el.textContent.trim()==='1')el.textContent='1st';
+      try{const before=d.defaultView.getComputedStyle(el,'::before').content;if(before==='"1"'||before==="'1'")el.classList.add('sf-first-ordinal')}catch(_){}
+    });
+  }
+
+  function ensureTiePlayers(d,sources){
+    const player=d.getElementById('mcPlayer');if(!player)return;
+    const card=d.querySelector('#medalCeremony .mc-card');if(card)card.classList.add('tie');
+    player.classList.add('sf-tie-player');
+    if(sources.p1){player.src=sources.p1;player.alt='Player 1 — joint 1st place'}
+    let player2=d.getElementById('mcPlayer2');
+    if(!player2){player2=player.cloneNode(true);player2.id='mcPlayer2';player.parentElement?.appendChild(player2)}
+    player2.classList.add('sf-tie-player');
+    if(sources.p2){player2.src=sources.p2;player2.alt='Player 2 — joint 1st place'}
+    player2.style.setProperty('display','block','important');
+  }
+
+  function clearTiePlayers(d){
+    const card=d.querySelector('#medalCeremony .mc-card');if(card)card.classList.remove('tie');
+    const player=d.getElementById('mcPlayer');if(player){player.classList.remove('sf-tie-player');player.style.removeProperty('left');player.style.removeProperty('width');player.style.removeProperty('height');player.style.removeProperty('bottom');player.style.removeProperty('animation')}
+    const player2=d.getElementById('mcPlayer2');if(player2){player2.classList.remove('sf-tie-player');player2.style.setProperty('display','none','important')}
+  }
+
+  function renderMatchMessage(msg,winner,stats){
+    if(!msg)return;
+    const title=winner==='tie'?"It's a tie!":`Winner: ${winner==='p2'?'Player 2':'Player 1'}`;
+    const note=winner==='tie'?'Both players share 1st place and receive the match award.':'Winner receives the standalone match award.';
+    let html=`<span class="sf-result-winner">${title}</span><span class="sf-result-note">${note}</span>`;
+    if(stats){html+=`<span class="sf-result-line">Player 1 — Correct: ${stats.c1} | Wrong: ${stats.w1}</span><span class="sf-result-line">Player 2 — Correct: ${stats.c2} | Wrong: ${stats.w2}</span>`}
+    msg.classList.add('sf-match-result-card');
+    if(msg.innerHTML!==html)msg.innerHTML=html;
+  }
+
   function enforcePieceWinner(d,winner,gm,stats){
-    const banner=d.querySelector('#medalCeremony .mc-banner'),sub=d.getElementById('mcSub'),msg=d.getElementById('mcMessage'),player=d.getElementById('mcPlayer'),player2=d.getElementById('mcPlayer2'),sources=ceremonyPlayerSources(d);
+    ensureCeremonyFallbackStyle(d);markFirstAsOrdinal(d);
+    const banner=d.querySelector('#medalCeremony .mc-banner'),sub=d.getElementById('mcSub'),msg=d.getElementById('mcMessage'),player=d.getElementById('mcPlayer'),sources=ceremonyPlayerSources(d);
     if(banner){const wanted=gm===2?'🏅 2-PLAYER MATCH AWARD 🏅':'🏅 1/11 MEDAL AWARD 🏅';if(banner.textContent!==wanted)banner.textContent=wanted}
     if(sub){const wanted=gm===2?`Practice ${PRACTICE_ID} • ${SPORT} • Standalone 2-player match`:`Practice ${PRACTICE_ID} of 11 • ${SPORT}`;if(sub.textContent!==wanted)sub.textContent=wanted}
-    if(winner==='p2'&&player&&sources.p2&&player.src!==sources.p2){player.src=sources.p2;player.alt='Player 2 on the rostrum'}
-    else if(winner==='p1'&&player&&sources.p1&&player.src!==sources.p1){player.src=sources.p1;player.alt='Player 1 on the rostrum'}
-    else if(winner==='tie'){
-      if(player&&sources.p1&&player.src!==sources.p1){player.src=sources.p1;player.alt='Player 1 on the rostrum'}
-      if(player2&&sources.p2&&player2.src!==sources.p2){player2.src=sources.p2;player2.alt='Player 2 on the rostrum';player2.style.removeProperty('display')}
+    if(gm===2&&winner==='tie'){
+      ensureTiePlayers(d,sources);
+    }else{
+      clearTiePlayers(d);
+      if(winner==='p2'&&player&&sources.p2&&player.src!==sources.p2){player.src=sources.p2;player.alt='Player 2 on the rostrum'}
+      else if(winner==='p1'&&player&&sources.p1&&player.src!==sources.p1){player.src=sources.p1;player.alt='Player 1 on the rostrum'}
     }
-    if(msg){const attemptLine=gm===2&&stats?` Player 1: ${stats.c1} correct, ${stats.w1} wrong. Player 2: ${stats.c2} correct, ${stats.w2} wrong.`:'';let wanted='';if(gm===1)wanted='Perfect score! Player 1 earns a 1/11 medal!';else if(winner==='tie')wanted='It is a tie! Player 1 and Player 2 both receive the match award!'+attemptLine;else{const why=stats&&stats.c1===stats.c2&&stats.w1!==stats.w2?' with fewer wrong attempts':'';wanted=`${winner==='p2'?'Player 2':'Player 1'} wins this match${why} and receives the winner award!`+attemptLine}if(msg.textContent!==wanted)msg.textContent=wanted}
+    if(gm===2)renderMatchMessage(msg,winner,stats);
+    else if(msg&&msg.textContent!=='Perfect score! Player 1 earns a 1/11 medal!')msg.textContent='Perfect score! Player 1 earns a 1/11 medal!';
   }
 
   function showCeremony(gm,outcome,progress){
@@ -238,18 +294,23 @@
         const w=frame.contentWindow,d=w.document;
         w.__sportsFiestaBridgeWinner=winner;w.__sportsFiestaBridgeMode=gm;
         d.body.classList.remove('cover-on');const cover=d.getElementById('fiestaCover');if(cover)cover.style.display='none';const app=d.querySelector('.app');if(app)app.style.setProperty('display','none','important');d.body.style.padding='0';d.body.style.overflow='hidden';
-        let stage='piece',guard=null;
+        let stage='piece',guard=null,started=false;
         const showPiece=()=>{
-          // 2-player uses preview/display mode deliberately so even an older cached
-          // cumulative-award wrapper cannot require or modify a 1-player medal record.
-          w.showMedalCeremony(gm===2,winner,'piece');
+          if(started)return;started=true;
+          // A real 2-player game is never a teacher preview. The fresh award UI is
+          // loaded below with a new query string so stale hub cache cannot bypass
+          // the tie/player-specific animation.
+          w.showMedalCeremony(false,winner,'piece');
           enforcePieceWinner(d,winner,gm,stats);
           const medal=d.getElementById('medalCeremony');
           if(medal&&w.MutationObserver){guard?.disconnect?.();guard=new w.MutationObserver(()=>{if(stage==='piece')enforcePieceWinner(d,winner,gm,stats)});guard.observe(medal,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['src','class','style']})}
-          [80,980,1980,2300,3200].forEach(ms=>setTimeout(()=>{if(stage==='piece')enforcePieceWinner(d,winner,gm,stats)},ms));
+          [80,650,980,1450,1980,2300,3200].forEach(ms=>setTimeout(()=>{if(stage==='piece')enforcePieceWinner(d,winner,gm,stats)},ms));
         };
+        const fresh=d.createElement('script');
+        fresh.src=HUB_URL+'sports-fiesta-award-ui-v2.js?v=20260823tie2';
+        fresh.onload=showPiece;fresh.onerror=showPiece;d.head.appendChild(fresh);
+        setTimeout(showPiece,900);
         const showGold=()=>{stage='gold';guard?.disconnect?.();markGoldAwarded();w.showMedalCeremony(false,'p1','gold');const sub=d.getElementById('mcSub'),msg=d.getElementById('mcMessage');if(sub)sub.textContent='All 11 Sports Fiesta 1-player lessons completed perfectly!';if(msg)msg.textContent='🏆 Player 1 receives the Sports Fiesta GOLD MEDAL! 🏆'};
-        showPiece();
         const close=d.querySelector('#medalCeremony .mc-close');if(close)close.addEventListener('click',()=>{if(awardGoldNow&&stage==='piece')setTimeout(showGold,90);else{guard?.disconnect?.();setTimeout(()=>frame.remove(),0)}});
         d.addEventListener('keydown',e=>{if(e.key!=='Escape')return;if(awardGoldNow&&stage==='piece')setTimeout(showGold,90);else{guard?.disconnect?.();setTimeout(()=>frame.remove(),0)}});
       }catch(e){console.warn('Sports Fiesta ceremony could not open',e);frame.remove()}
