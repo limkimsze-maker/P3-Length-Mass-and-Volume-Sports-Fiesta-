@@ -1,8 +1,8 @@
 (() => {
-  if (window.__sportsFiestaAllPreviewMenuV1) return;
-  window.__sportsFiestaAllPreviewMenuV1 = true;
+  if (window.__sportsFiestaAllPreviewMenuV2) return;
+  window.__sportsFiestaAllPreviewMenuV2 = true;
 
-  const STYLE_ID = 'sfAllPreviewStyleV1';
+  const STYLE_ID = 'sfAllPreviewStyleV2';
   const PASS_ID = 'sfAllPreviewPassV1';
   const MENU_ID = 'sfAllPreviewMenuV1';
 
@@ -49,6 +49,65 @@
   function show(el) { el?.classList.add('show'); el?.setAttribute('aria-hidden','false'); }
   function hide(el) { el?.classList.remove('show'); el?.setAttribute('aria-hidden','true'); }
 
+  function wellDoneFor(winner) {
+    if (winner === 'p2') return 'Well done, Player 2.';
+    if (winner === 'tie') return 'Well done, both players!';
+    return 'Well done, Player 1.';
+  }
+
+  function setWinnerMessage(winner, preserveScoreLines = false) {
+    const msg = document.getElementById('mcMessage');
+    if (!msg) return false;
+    const wanted = wellDoneFor(winner);
+    const currentText = (msg.textContent || '').trim();
+    if (currentText.startsWith(wanted)) return true;
+
+    let tail = '';
+    if (preserveScoreLines) {
+      const html = msg.innerHTML || '';
+      const br = html.indexOf('<br>');
+      if (br >= 0) tail = html.slice(br);
+    }
+    msg.innerHTML = `<b>${wanted}</b>${tail}`;
+    return true;
+  }
+
+  function bridgeResult() {
+    try {
+      const p = new URLSearchParams(location.search);
+      if (!/^award-v(?:6|7|8)/.test(p.get('ceremonyBridge') || '')) return null;
+      if (Number(p.get('mode')) !== 2 && Number(window.__sportsFiestaBridgeMode) !== 2) return null;
+      const w = window.__sportsFiestaBridgeWinner || p.get('winner');
+      return w === 'p1' || w === 'p2' || w === 'tie' ? w : null;
+    } catch (_) { return null; }
+  }
+
+  function installRealResultCopyGuard() {
+    const winner = bridgeResult();
+    if (!winner) return;
+
+    const enforce = () => setWinnerMessage(winner, true);
+    [0,40,100,220,450,800,1300,2100,3200,5000].forEach(ms => setTimeout(enforce, ms));
+
+    let observed = null;
+    let attempts = 0;
+    const findTimer = setInterval(() => {
+      const msg = document.getElementById('mcMessage');
+      if (msg && msg !== observed) {
+        observed = msg;
+        let busy = false;
+        new MutationObserver(() => {
+          if (busy) return;
+          busy = true;
+          enforce();
+          busy = false;
+        }).observe(msg, {subtree:true, childList:true, characterData:true});
+        enforce();
+      }
+      if (++attempts > 100) clearInterval(findTimer);
+    }, 50);
+  }
+
   function setCopy(scenario) {
     const banner = document.querySelector('#medalCeremony .mc-banner');
     const sub = document.getElementById('mcSub');
@@ -57,23 +116,23 @@
     if (scenario === 'single-piece') {
       banner.textContent = '🏅 1-PLAYER 1/11 MEDAL AWARD 🏅';
       sub.textContent = 'Teacher preview • perfect 1-player practice';
-      msg.textContent = 'Player 1 completes the practice perfectly and earns 1/11 of the gold medal!';
+      msg.textContent = 'Well done, Player 1.';
     } else if (scenario === 'p1-win') {
       banner.textContent = '🏅 2-PLAYER MATCH AWARD 🏅';
       sub.textContent = 'Teacher preview • Player 1 wins';
-      msg.textContent = 'Player 1 wins the match and earns the 1/11 gold medal piece!';
+      msg.textContent = 'Well done, Player 1.';
     } else if (scenario === 'p2-win') {
       banner.textContent = '🏅 2-PLAYER MATCH AWARD 🏅';
       sub.textContent = 'Teacher preview • Player 2 wins';
-      msg.textContent = 'Player 2 wins the match and earns the 1/11 gold medal piece!';
+      msg.textContent = 'Well done, Player 2.';
     } else if (scenario === 'tie') {
       banner.textContent = '🏅 2-PLAYER SHARED AWARD 🏅';
       sub.textContent = 'Teacher preview • Tie / Shared 1st';
-      msg.textContent = 'It is a tie! Player 1 and Player 2 share 1st place!';
+      msg.textContent = 'Well done, both players!';
     } else if (scenario === 'gold') {
       banner.textContent = '🏆 GOLD MEDAL CEREMONY 🏆';
       sub.textContent = 'Teacher preview • all 11 practices completed perfectly';
-      msg.textContent = '🏆 Player 1 receives the complete Sports Fiesta GOLD MEDAL! 🏆';
+      msg.textContent = '🏆 GOLD MEDAL CHAMPION — Well done, Player 1. 🏆';
     }
   }
 
@@ -86,7 +145,7 @@
     else if (scenario === 'tie') window.showMedalCeremony(true,'tie','piece');
     else if (scenario === 'gold') window.showMedalCeremony(true,'p1','gold');
     else return;
-    [0,80,250,600].forEach(ms => setTimeout(() => setCopy(scenario), ms));
+    [0,60,120,250,500,900,1500,2500].forEach(ms => setTimeout(() => setCopy(scenario), ms));
   }
 
   function bind() {
@@ -125,6 +184,8 @@
     menu.querySelectorAll('[data-sf-preview]').forEach(btn => {
       btn.addEventListener('click', () => playScenario(btn.dataset.sfPreview));
     });
+
+    installRealResultCopyGuard();
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bind, {once:true});
