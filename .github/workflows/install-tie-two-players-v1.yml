@@ -7,19 +7,31 @@ permissions:
   contents: write
 jobs:
   update-hub:
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Load tie ceremony layout
+      - name: Load latest tie ceremony layout
+        env:
+          CACHE_KEY: ${{ github.sha }}
         run: |
           python - <<'PY'
           from pathlib import Path
-          p=Path('index.html')
-          s=p.read_text(encoding='utf-8')
-          tag='<script src="tie-ceremony-two-players-v1.js?v=20260810a"></script>'
-          if tag not in s:
-              s=s.replace('</body>', tag+'\n</body>', 1)
-              p.write_text(s,encoding='utf-8')
+          import os, re
+
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+          version = os.environ.get('CACHE_KEY', 'latest')[:12]
+          tag = f'<script src="tie-ceremony-two-players-v1.js?v={version}"></script>'
+          pattern = r'<script\s+src=["\']tie-ceremony-two-players-v1\.js(?:\?[^"\']*)?["\']\s*></script>'
+
+          if re.search(pattern, s):
+              updated = re.sub(pattern, tag, s, count=1)
+          else:
+              updated = s.replace('</body>', tag + '\n</body>', 1)
+
+          if updated != s:
+              p.write_text(updated, encoding='utf-8')
           PY
       - name: Commit update
         run: |
@@ -27,5 +39,5 @@ jobs:
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add index.html
-          git commit -m "Show both players clearly for tie ceremony"
+          git commit -m "Refresh two-player tie ceremony script"
           git push
