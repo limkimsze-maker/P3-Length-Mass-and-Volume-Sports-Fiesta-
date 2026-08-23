@@ -58,7 +58,7 @@
 
   // Shared mastery/fair-play rule for Practices 1–11.
   const retryScript = document.createElement('script');
-  retryScript.src = HUB_URL + 'sports-fiesta-retry-v1.js?v=20260823c';
+  retryScript.src = HUB_URL + 'sports-fiesta-retry-v1.js?v=20260823d';
   retryScript.dataset.practice = String(PRACTICE_ID);
   retryScript.async = false;
   document.head.appendChild(retryScript);
@@ -138,7 +138,17 @@
       };
     }
 
-    // Practice 1 is a true first-to-finish race. Practices 2–11 are equal-turn games;
+    // Practice 11: the Torch Relay winner is determined strictly by the actual
+    // correct-answer scores. This must take priority over any shared fair-play
+    // value so Player 2 cannot be replaced by Player 1 in the medal ceremony.
+    if (PRACTICE_ID === 11 && s.c1 != null && s.c2 != null) {
+      return {
+        winner: s.c1 === s.c2 ? 'tie' : (s.c1 > s.c2 ? 'p1' : 'p2'),
+        perfect: false
+      };
+    }
+
+    // Practice 1 is a true first-to-finish race. Practices 2–10 are equal-turn games;
     // the fair-play helper supplies p1, p2 or tie according to the number of mistakes.
     const fairWinner = window.__sportsFiestaFairWinner;
     if (PRACTICE_ID !== 1 && (fairWinner === 'p1' || fairWinner === 'p2' || fairWinner === 'tie')) {
