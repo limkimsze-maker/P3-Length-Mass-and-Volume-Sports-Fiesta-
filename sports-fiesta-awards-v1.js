@@ -16,6 +16,43 @@
     };
   }
 
+  // Practice 11 display rule: keep each answer value and its ml unit together.
+  // This prevents displays such as "900" at the end of one line and "ml" on the next.
+  if (PRACTICE_ID === 11) {
+    const style = document.createElement('style');
+    style.textContent = '.sf-unit-pair{display:inline-flex;align-items:center;gap:7px;white-space:nowrap}';
+    document.head.appendChild(style);
+
+    const keepMlWithAnswer = () => {
+      document.querySelectorAll('#questionContent .eqLine input.answerInput').forEach(input => {
+        if (input.closest('.sf-unit-pair')) return;
+        const unitSpan = input.nextElementSibling;
+        if (!unitSpan) return;
+        const text = unitSpan.textContent || '';
+        const match = text.match(/^\s*ml\b(.*)$/i);
+        if (!match) return;
+
+        const pair = document.createElement('span');
+        pair.className = 'sf-unit-pair';
+        const ml = document.createElement('span');
+        ml.textContent = 'ml';
+
+        input.parentNode.insertBefore(pair, input);
+        pair.appendChild(input);
+        pair.appendChild(ml);
+
+        const rest = match[1] || '';
+        if (rest) unitSpan.textContent = rest;
+        else unitSpan.remove();
+      });
+    };
+
+    const target = document.getElementById('questionContent') || document.body;
+    new MutationObserver(keepMlWithAnswer).observe(target, {subtree:true, childList:true});
+    window.addEventListener('load', keepMlWithAnswer);
+    setTimeout(keepMlWithAnswer, 0);
+  }
+
   const HUB_KEY = 'sportsFiestaHubProgress_v1';
   const HUB_URL = 'https://limkimsze-maker.github.io/P3-Length-Mass-and-Volume-Sports-Fiesta-/';
 
