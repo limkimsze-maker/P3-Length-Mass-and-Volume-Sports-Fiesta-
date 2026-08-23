@@ -332,12 +332,55 @@
     };
   }
 
-  /* SF_FLOW_CHEAT_V1 */
+  /* SF_FLOW_CHEAT_V2 — full result screen then the real ceremony. */
   function cheatStats(kind, total) {
     if (kind === 'single') return {correct:[total,0], wrong:[0,0]};
     if (kind === 'p1') return {correct:[10,7], wrong:[0,3]};
     if (kind === 'p2') return {correct:[7,10], wrong:[3,0]};
     return {correct:[8,8], wrong:[2,2]};
+  }
+
+  function cheatCopy(kind, total) {
+    if (kind === 'p1') return {title:'Player 1 Wins!', well:'Well done, Player 1.', scores:'Player 1 — Correct: 10 | Wrong: 0<br>Player 2 — Correct: 7 | Wrong: 3'};
+    if (kind === 'p2') return {title:'Player 2 Wins!', well:'Well done, Player 2.', scores:'Player 1 — Correct: 7 | Wrong: 3<br>Player 2 — Correct: 10 | Wrong: 0'};
+    if (kind === 'tie') return {title:'It’s a Tie!', well:'Well done, both players!', scores:'Player 1 — Correct: 8 | Wrong: 2<br>Player 2 — Correct: 8 | Wrong: 2'};
+    return {title:'Practice Complete!', well:'Well done, Player 1.', scores:`Player 1 — Correct: ${total} | Wrong: 0`};
+  }
+
+  function restoreCheatStats(fake, previousStats) {
+    if (window.__sportsFiestaAttemptStats !== fake) return;
+    if (previousStats == null) delete window.__sportsFiestaAttemptStats;
+    else window.__sportsFiestaAttemptStats = previousStats;
+  }
+
+  function showCheatResult(kind, gm, outcome, progress, fake, previousStats, total) {
+    document.getElementById('sfCheatFlowResultV2')?.remove();
+    const copy = cheatCopy(kind, total);
+    const overlay = document.createElement('div');
+    overlay.id = 'sfCheatFlowResultV2';
+    Object.assign(overlay.style, {
+      position:'fixed', inset:'0', zIndex:'2147483646', display:'flex',
+      alignItems:'center', justifyContent:'center', padding:'18px',
+      background:'rgba(12,42,75,.86)', backdropFilter:'blur(5px)',
+      fontFamily:'Trebuchet MS,Arial,sans-serif'
+    });
+    overlay.innerHTML = `
+      <div style="width:min(520px,94vw);background:#fff;color:#17324d;border:5px solid #d9ecff;border-radius:26px;padding:24px;text-align:center;box-shadow:0 24px 70px rgba(0,0,0,.32)">
+        <div style="font-size:13px;font-weight:900;color:#6d35c7;margin-bottom:8px">🧪 FLOW TEST • PRACTICE ${PRACTICE_ID}</div>
+        <div style="font-size:clamp(28px,6vw,42px);font-weight:1000;margin:4px 0 8px">${copy.title}</div>
+        <div style="font-size:20px;font-weight:1000;color:#267044;margin-bottom:14px">${copy.well}</div>
+        <div style="font-size:17px;font-weight:800;line-height:1.65;background:#f4f8fc;border-radius:16px;padding:13px 15px;margin:0 auto 18px">${copy.scores}</div>
+        <button id="sfCheatFlowNextV2" type="button" style="min-width:170px;border:0;border-radius:15px;padding:13px 22px;background:#f4c542;color:#4b3700;font-size:20px;font-weight:1000;cursor:pointer;box-shadow:0 5px 0 #c99d22">Next →</button>
+      </div>`;
+    document.body.appendChild(overlay);
+
+    const next = overlay.querySelector('#sfCheatFlowNextV2');
+    next.onclick = () => {
+      next.disabled = true;
+      overlay.remove();
+      showCeremony(gm, outcome, progress);
+      setTimeout(() => restoreCheatStats(fake, previousStats), 0);
+    };
   }
 
   function cheatFinish(kind) {
@@ -358,18 +401,9 @@
       outcome = {winner:kind, perfect:false};
     }
 
-    try {
-      handledResult = true;
-      const progress = updateProgress(gm, outcome);
-      showCeremony(gm, outcome, progress);
-    } finally {
-      setTimeout(() => {
-        if (window.__sportsFiestaAttemptStats === fake) {
-          if (previousStats == null) delete window.__sportsFiestaAttemptStats;
-          else window.__sportsFiestaAttemptStats = previousStats;
-        }
-      }, 0);
-    }
+    handledResult = true;
+    const progress = updateProgress(gm, outcome);
+    showCheatResult(kind, gm, outcome, progress, fake, previousStats, total);
   }
   window.__sportsFiestaCheatFinish = cheatFinish;
 
@@ -413,13 +447,22 @@
       const open = panel.classList.toggle('open');
       toggle.setAttribute('aria-expanded', String(open));
     });
-    panel.querySelectorAll('[data-sf-cheat]').forEach(btn => {
-      btn.addEventListener('click', () => {
+
+    /* Capture the test outcome in this same practice document before any cover-level
+       preview helper can intercept it. */
+    if (!window.__sfAwardCheatCaptureV2) {
+      window.__sfAwardCheatCaptureV2 = true;
+      document.addEventListener('click', e => {
+        const btn = e.target.closest?.('#sfFlowCheatPanel [data-sf-cheat]');
+        if (!btn) return;
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
         panel.classList.remove('open');
         toggle.setAttribute('aria-expanded','false');
         cheatFinish(btn.dataset.sfCheat);
-      });
-    });
+      }, true);
+    }
   }
 
   if (document.readyState === 'loading') {
