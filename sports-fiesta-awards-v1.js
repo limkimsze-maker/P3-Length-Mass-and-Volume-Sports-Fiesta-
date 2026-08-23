@@ -6,6 +6,16 @@
   if (!PRACTICE_ID || window.__sportsFiestaAwardsOnlyV1) return;
   window.__sportsFiestaAwardsOnlyV1 = true;
 
+  // Practice 10 visual correction: the lane-marker bar colours should match their labels.
+  if (PRACTICE_ID === 10 && typeof window.markerStripSVG === 'function') {
+    const originalMarkerStripSVG = window.markerStripSVG;
+    window.markerStripSVG = function(a, extra) {
+      return originalMarkerStripSVG(a, extra)
+        .replace('fill="#efc78f"', 'fill="#4a90e2"')
+        .replace('fill="#e576a6"', 'fill="#f6c94c"');
+    };
+  }
+
   const HUB_KEY = 'sportsFiestaHubProgress_v1';
   const HUB_URL = 'https://limkimsze-maker.github.io/P3-Length-Mass-and-Volume-Sports-Fiesta-/';
   let handledResult = false;
