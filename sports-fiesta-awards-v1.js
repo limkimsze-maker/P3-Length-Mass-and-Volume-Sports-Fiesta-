@@ -1,4 +1,4 @@
-/* Sports Fiesta awards only — no question/gameplay changes */
+/* Sports Fiesta awards and shared project helpers */
 (() => {
   const script = document.currentScript;
   const PRACTICE_ID = Number(script?.dataset?.practice || 0);
@@ -18,6 +18,14 @@
 
   const HUB_KEY = 'sportsFiestaHubProgress_v1';
   const HUB_URL = 'https://limkimsze-maker.github.io/P3-Length-Mass-and-Volume-Sports-Fiesta-/';
+
+  // Shared mastery rule for Practices 1–11: a wrong answer stays on the same question.
+  const retryScript = document.createElement('script');
+  retryScript.src = HUB_URL + 'sports-fiesta-retry-v1.js?v=20260823a';
+  retryScript.dataset.practice = String(PRACTICE_ID);
+  retryScript.async = false;
+  document.head.appendChild(retryScript);
+
   let handledResult = false;
   let timer = null;
 
