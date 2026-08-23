@@ -1,4 +1,4 @@
-name: Install Two Player Tie Ceremony V1
+name: Install Sports Fiesta Ceremony Controllers
 on:
   push:
     branches: [main]
@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Load latest tie ceremony layout
+      - name: Load latest ceremony controllers
         env:
           CACHE_KEY: ${{ github.sha }}
         run: |
@@ -22,13 +22,25 @@ jobs:
           p = Path('index.html')
           s = p.read_text(encoding='utf-8')
           version = os.environ.get('CACHE_KEY', 'latest')[:12]
-          tag = f'<script src="tie-ceremony-two-players-v1.js?v={version}"></script>'
-          pattern = r'<script\s+src=["\']tie-ceremony-two-players-v1\.js(?:\?[^"\']*)?["\']\s*></script>'
+          updated = s
 
-          if re.search(pattern, s):
-              updated = re.sub(pattern, tag, s, count=1)
+          tie_tag = f'<script src="tie-ceremony-two-players-v1.js?v={version}"></script>'
+          tie_pattern = r'<script\s+src=["\']tie-ceremony-two-players-v1\.js(?:\?[^"\']*)?["\']\s*></script>'
+          if re.search(tie_pattern, updated):
+              updated = re.sub(tie_pattern, tie_tag, updated, count=1)
           else:
-              updated = s.replace('</body>', tag + '\n</body>', 1)
+              updated = updated.replace('</body>', tie_tag + '\n</body>', 1)
+
+          preview_tag = f'<script src="sports-fiesta-preview-menu-v1.js?v={version}"></script>'
+          preview_pattern = r'<script\s+src=["\']sports-fiesta-preview-menu-v1\.js(?:\?[^"\']*)?["\']\s*></script>'
+          if re.search(preview_pattern, updated):
+              updated = re.sub(preview_pattern, preview_tag, updated, count=1)
+          else:
+              award_pattern = r'(<script\s+src=["\']sports-fiesta-award-ui-v2\.js(?:\?[^"\']*)?["\']\s*></script>)'
+              if re.search(award_pattern, updated):
+                  updated = re.sub(award_pattern, r'\1\n' + preview_tag, updated, count=1)
+              else:
+                  updated = updated.replace('</body>', preview_tag + '\n</body>', 1)
 
           if updated != s:
               p.write_text(updated, encoding='utf-8')
@@ -39,5 +51,5 @@ jobs:
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add index.html
-          git commit -m "Refresh two-player tie ceremony script"
+          git commit -m "Refresh ceremony controllers"
           git push
