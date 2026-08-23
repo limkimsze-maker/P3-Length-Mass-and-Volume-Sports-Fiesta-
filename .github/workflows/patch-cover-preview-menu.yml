@@ -1,0 +1,49 @@
+name: Patch Cover Preview Menu
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+jobs:
+  patch-menu:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Replace inline award preview menu
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+          start_marker = '<div id="sfPreviewMenu"'
+          end_marker = '<!-- SF_REWARD_UPGRADE_HTML_END -->'
+          start = s.find(start_marker)
+          end = s.find(end_marker, start if start >= 0 else 0)
+          if start < 0 or end <= start:
+              raise SystemExit('Preview menu markers not found')
+
+          menu = '''<div id="sfPreviewMenu" aria-hidden="true"><div class="sfBox">
+  <h3>🏅 Preview Every Award Animation</h3><p>Choose any real award scenario. Preview only — saved pupil progress will not change.</p>
+  <div class="sfBtns">
+    <button class="sfChoice" onclick="sfPreview('p1','piece')">👤 1 Player — Earn 1/11</button>
+    <button class="sfChoice" onclick="sfPreview('p1','piece')">🔵 2 Players — Player 1 Wins</button>
+    <button class="sfChoice" onclick="sfPreview('p2','piece')">🔴 2 Players — Player 2 Wins</button>
+    <button class="sfChoice" onclick="sfPreview('tie','piece')">🤝 2 Players — Tie / Shared 1st</button>
+    <button class="sfChoice" onclick="sfPreview('p1','gold')">🏆 11/11 — Final Gold Medal</button>
+    <button class="sfCancel" onclick="sfCloseMenu()">Close</button>
+  </div>
+</div></div>
+'''
+          updated = s[:start] + menu + s[end:]
+          if updated != s:
+              p.write_text(updated, encoding='utf-8')
+          PY
+      - name: Commit inline menu
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add index.html
+          git commit -m "Show all award animations in cover preview"
+          git push
