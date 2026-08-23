@@ -1,0 +1,108 @@
+name: Fix Return to Hub Across All Practices
+
+on:
+  push:
+    paths:
+      - '.github/workflows/fix-return-to-hub-all-practices.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Add parent-level return controls to shared award bridge
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path('sports-fiesta-awards-v1.js')
+          s = p.read_text(encoding='utf-8')
+          marker = 'SF_RETURN_HUB_PARENT_V1'
+          if marker in s:
+              print('shared return hotfix already present')
+              raise SystemExit(0)
+
+          helper_anchor = '  function showCeremony(gm, outcome, progress) {'
+          if helper_anchor not in s:
+              raise SystemExit('showCeremony anchor not found')
+
+          helpers = r'''  /* SF_RETURN_HUB_PARENT_V1 — reliable return path shared by Practices 1–11. */
+  function goHubNow(e) {
+    if (e) {
+      e.preventDefault?.();
+      e.stopPropagation?.();
+    }
+    try {
+      if (window.top && window.top !== window) {
+        window.top.location.href = HUB_URL;
+        return false;
+      }
+    } catch (_) {}
+    window.location.href = HUB_URL;
+    return false;
+  }
+
+  function ensureResultHomeButton(result) {
+    if (!result) return null;
+    let btn = document.getElementById('sfResultBackHome');
+    if (!btn) {
+      btn = document.createElement('button');
+      btn.id = 'sfResultBackHome';
+      btn.type = 'button';
+      btn.textContent = '← Back to Hub';
+      btn.setAttribute('aria-label', 'Back to Sports Fiesta Practice Hub');
+      btn.className = 'bigbtn';
+      btn.style.cssText = 'display:block!important;min-width:190px!important;margin:12px auto 5px!important;padding:13px 22px!important;border:0!important;border-radius:15px!important;background:#1769aa!important;color:#fff!important;font:900 18px/1.1 "Trebuchet MS",Arial,sans-serif!important;box-shadow:0 5px 0 #0b4778!important;cursor:pointer!important;visibility:visible!important;opacity:1!important;position:relative!important;z-index:2147483002!important;';
+      const box = result.querySelector('.results') || result;
+      box.appendChild(btn);
+    }
+    btn.onclick = goHubNow;
+    return btn;
+  }
+
+'''
+          s = s.replace(helper_anchor, helpers + helper_anchor, 1)
+
+          old_frame = """    Object.assign(frame.style, {\n      position:'fixed', inset:'0', width:'100%', height:'100%', border:'0',\n      zIndex:'2147483647', background:'#185b9d'\n    });\n    document.body.appendChild(frame);\n\n    frame.onload = () => {"""
+          new_frame = """    Object.assign(frame.style, {\n      position:'fixed', inset:'0', width:'100%', height:'100%', border:'0',\n      zIndex:'2147483600', background:'#185b9d'\n    });\n    document.body.appendChild(frame);\n\n    const returnBtn = document.createElement('button');\n    returnBtn.id = 'sfCeremonyReturnHub';\n    returnBtn.type = 'button';\n    returnBtn.textContent = '← Back to Hub';\n    returnBtn.setAttribute('aria-label', 'Back to Sports Fiesta Practice Hub');\n    returnBtn.style.cssText = 'position:fixed!important;left:14px!important;top:14px!important;z-index:2147483647!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;min-width:150px!important;min-height:48px!important;padding:10px 16px!important;border:3px solid #fff!important;border-radius:15px!important;background:#1769aa!important;color:#fff!important;font:900 16px/1.1 "Trebuchet MS",Arial,sans-serif!important;box-shadow:0 5px 0 #0b4778,0 8px 18px rgba(0,0,0,.2)!important;cursor:pointer!important;visibility:visible!important;opacity:1!important;';\n    returnBtn.onclick = goHubNow;\n    document.body.appendChild(returnBtn);\n\n    const cleanupCeremony = () => {\n      try { frame.remove(); } catch (_) {}\n      try { returnBtn.remove(); } catch (_) {}\n    };\n\n    frame.onload = () => {"""
+          if old_frame not in s:
+              raise SystemExit('ceremony frame anchor not found')
+          s = s.replace(old_frame, new_frame, 1)
+
+          old_bridge = """        w.__sportsFiestaBridgeWinner = winner;\n        w.__sportsFiestaBridgeMode = gm;\n\n        d.body.classList.remove('cover-on');"""
+          new_bridge = """        w.__sportsFiestaBridgeWinner = winner;\n        w.__sportsFiestaBridgeMode = gm;\n        w.goSportsFiestaHome = goHubNow;\n\n        /* Rewire any historical ceremony home control to the parent practice\n           navigation as a second independent route. */\n        d.querySelectorAll('.mc-home,#sfCeremonyBackHome').forEach(el => {\n          el.onclick = goHubNow;\n        });\n\n        d.body.classList.remove('cover-on');"""
+          if old_bridge not in s:
+              raise SystemExit('ceremony bridge anchor not found')
+          s = s.replace(old_bridge, new_bridge, 1)
+
+          s = s.replace("else setTimeout(() => frame.remove(), 0);", "else setTimeout(cleanupCeremony, 0);", 2)
+          s = s.replace("        frame.remove();\n      }\n    };", "        cleanupCeremony();\n      }\n    };", 1)
+
+          old_add = """  function addCeremonyNextButton(gm, outcome, progress) {\n    const result = document.getElementById('results');\n    if (!result || !progress.qualifies) return;"""
+          new_add = """  function addCeremonyNextButton(gm, outcome, progress) {\n    const result = document.getElementById('results');\n    if (!result) return;\n    ensureResultHomeButton(result);\n    if (!progress.qualifies) return;"""
+          if old_add not in s:
+              raise SystemExit('result button anchor not found')
+          s = s.replace(old_add, new_add, 1)
+
+          old_check = """      if (!visible(result)) {\n        handledResult = false;\n        document.getElementById('sfCeremonyNext')?.remove();\n        return;\n      }\n      if (handledResult) return;"""
+          new_check = """      if (!visible(result)) {\n        handledResult = false;\n        document.getElementById('sfCeremonyNext')?.remove();\n        return;\n      }\n      ensureResultHomeButton(result);\n      if (handledResult) return;"""
+          if old_check not in s:
+              raise SystemExit('checkResult anchor not found')
+          s = s.replace(old_check, new_check, 1)
+
+          p.write_text(s, encoding='utf-8')
+          PY
+          node --check sports-fiesta-awards-v1.js
+      - name: Commit shared return fix
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add sports-fiesta-awards-v1.js
+          git commit -m "Add reliable Back to Hub for all practices"
+          git push
