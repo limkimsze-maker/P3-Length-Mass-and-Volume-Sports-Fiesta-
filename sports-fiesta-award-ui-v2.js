@@ -1,7 +1,7 @@
 /* SPORTS FIESTA AWARD UI — use the hub preview animation as the single source of truth */
 (() => {
-  if (window.__sportsFiestaPreviewAwardBridgeV1) return;
-  window.__sportsFiestaPreviewAwardBridgeV1 = true;
+  if (window.__sportsFiestaPreviewAwardBridgeV2) return;
+  window.__sportsFiestaPreviewAwardBridgeV2 = true;
 
   const base = window.showMedalCeremony;
   if (typeof base !== 'function') return;
@@ -147,6 +147,87 @@
     return out;
   };
 
-  wrapped.__sportsFiestaPreviewAwardBridgeV1 = true;
+  wrapped.__sportsFiestaPreviewAwardBridgeV2 = true;
   window.showMedalCeremony = wrapped;
+
+  function setPreviewCopy(scenario) {
+    const banner = document.querySelector('#medalCeremony .mc-banner');
+    const sub = document.getElementById('mcSub');
+    const msg = document.getElementById('mcMessage');
+    if (!banner || !sub || !msg) return;
+
+    if (scenario === 'single-piece') {
+      banner.textContent = '🏅 1-PLAYER 1/11 MEDAL AWARD 🏅';
+      sub.textContent = 'Teacher preview • perfect 1-player practice';
+      msg.textContent = 'Player 1 completes the practice perfectly and earns 1/11 of the gold medal!';
+    } else if (scenario === 'p1-win') {
+      banner.textContent = '🏅 2-PLAYER MATCH AWARD 🏅';
+      sub.textContent = 'Teacher preview • Player 1 wins';
+      msg.textContent = 'Player 1 wins the match and earns the 1/11 gold medal piece!';
+    } else if (scenario === 'p2-win') {
+      banner.textContent = '🏅 2-PLAYER MATCH AWARD 🏅';
+      sub.textContent = 'Teacher preview • Player 2 wins';
+      msg.textContent = 'Player 2 wins the match and earns the 1/11 gold medal piece!';
+    } else if (scenario === 'tie') {
+      banner.textContent = '🏅 2-PLAYER SHARED AWARD 🏅';
+      sub.textContent = 'Teacher preview • tie';
+      msg.textContent = 'It is a tie! Player 1 and Player 2 share 1st place!';
+    } else if (scenario === 'gold') {
+      banner.textContent = '🏆 GOLD MEDAL CEREMONY 🏆';
+      sub.textContent = 'Teacher preview • all 11 practices completed perfectly';
+      msg.textContent = '🏆 Player 1 receives the complete Sports Fiesta GOLD MEDAL! 🏆';
+    }
+  }
+
+  function previewScenario(scenario) {
+    if (typeof window.sfCloseMenu === 'function') window.sfCloseMenu();
+
+    if (scenario === 'single-piece') {
+      window.showMedalCeremony(true, 'p1', 'piece');
+    } else if (scenario === 'p1-win') {
+      window.showMedalCeremony(true, 'p1', 'piece');
+    } else if (scenario === 'p2-win') {
+      window.showMedalCeremony(true, 'p2', 'piece');
+    } else if (scenario === 'tie') {
+      window.showMedalCeremony(true, 'tie', 'piece');
+    } else if (scenario === 'gold') {
+      window.showMedalCeremony(true, 'p1', 'gold');
+    } else {
+      return;
+    }
+
+    setPreviewCopy(scenario);
+  }
+
+  window.sfPreviewScenario = previewScenario;
+
+  function installAllPreviewChoices() {
+    const menu = document.getElementById('sfPreviewMenu');
+    const box = menu?.querySelector('.sfBox');
+    const buttons = box?.querySelector('.sfBtns');
+    if (!buttons || buttons.dataset.allAwardAnimations === '1') return false;
+
+    const heading = box.querySelector('h3');
+    const note = box.querySelector('p');
+    if (heading) heading.textContent = '🏅 Preview Every Award Animation';
+    if (note) note.textContent = 'Choose any real award scenario. Preview only — saved pupil progress will not change.';
+
+    buttons.innerHTML = `
+      <button class="sfChoice" type="button" onclick="sfPreviewScenario('single-piece')">👤 1 Player — Earn 1/11</button>
+      <button class="sfChoice" type="button" onclick="sfPreviewScenario('p1-win')">🔵 2 Players — Player 1 Wins</button>
+      <button class="sfChoice" type="button" onclick="sfPreviewScenario('p2-win')">🔴 2 Players — Player 2 Wins</button>
+      <button class="sfChoice" type="button" onclick="sfPreviewScenario('tie')">🤝 2 Players — Tie / Shared 1st</button>
+      <button class="sfChoice" type="button" onclick="sfPreviewScenario('gold')">🏆 11/11 — Final Gold Medal</button>
+      <button class="sfCancel" type="button" onclick="sfCloseMenu()">Close</button>
+    `;
+    buttons.dataset.allAwardAnimations = '1';
+    return true;
+  }
+
+  if (!installAllPreviewChoices()) {
+    let tries = 0;
+    const previewTimer = setInterval(() => {
+      if (installAllPreviewChoices() || ++tries > 40) clearInterval(previewTimer);
+    }, 100);
+  }
 })();
