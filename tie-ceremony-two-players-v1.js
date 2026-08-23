@@ -1,9 +1,9 @@
 (() => {
-  if (window.__sfTieDirectV3) return;
-  window.__sfTieDirectV3 = true;
+  if (window.__sfTieDirectV4) return;
+  window.__sfTieDirectV4 = true;
 
   const style = document.createElement('style');
-  style.id = 'sf-tie-two-players-v3';
+  style.id = 'sf-tie-two-players-v4';
   style.textContent = `
     #medalCeremony .mc-card.tie .mc-side{opacity:.35!important}
     #medalCeremony .mc-card.tie .mc-podium::before{content:"1st"!important;font-size:64px!important;line-height:1.7!important}
@@ -11,6 +11,7 @@
     #medalCeremony .mc-card.tie #mcPlayer2{
       position:absolute!important;
       display:block!important;
+      visibility:visible!important;
       top:auto!important;
       bottom:118px!important;
       width:min(190px,28%)!important;
@@ -69,11 +70,52 @@
   `;
   document.head.appendChild(style);
 
+  function validSrc(x){
+    return typeof x === 'string' && x.trim() && !x.endsWith('/') && x !== location.href;
+  }
+
   function playerSources(){
+    let p1 = '', p2 = '';
+
+    // Use the hub's own player-source helper first. This is the same source used
+    // by the normal Player 1 / Player 2 award ceremony.
+    try {
+      if (typeof window.imgs === 'function') {
+        const a = window.imgs();
+        if (Array.isArray(a)) {
+          p1 = a[0] || '';
+          p2 = a[1] || '';
+        }
+      }
+    } catch (_) {}
+
+    // The cover images are populated from the original player cards at startup.
     const cards = [...document.querySelectorAll('.playerImgWrap img.playerSvg')];
+    p1 = p1 || document.getElementById('fcP1')?.src || cards[0]?.src || '';
+    p2 = p2 || document.getElementById('fcP2')?.src || cards[1]?.src || '';
+
+    return {p1: validSrc(p1) ? p1 : '', p2: validSrc(p2) ? p2 : ''};
+  }
+
+  function seedPlayersFromHub(){
+    // Reuse the proven hub routine. It creates mcPlayer2 and assigns the same
+    // real player images that are used for normal Player 1 / Player 2 wins.
+    try {
+      if (typeof window.preparePlayers === 'function') window.preparePlayers('tie');
+    } catch (_) {}
+
+    const p1 = document.getElementById('mcPlayer');
+    const p2 = document.getElementById('mcPlayer2');
+    const fallback = playerSources();
+
+    if (p1 && !validSrc(p1.src) && fallback.p1) p1.src = fallback.p1;
+    if (p2 && !validSrc(p2.src) && fallback.p2) p2.src = fallback.p2;
+
     return {
-      p1: document.getElementById('fcP1')?.src || cards[0]?.src || '',
-      p2: document.getElementById('fcP2')?.src || cards[1]?.src || ''
+      p1,
+      p2,
+      p1src: validSrc(p1?.src) ? p1.src : fallback.p1,
+      p2src: validSrc(p2?.src) ? p2.src : fallback.p2
     };
   }
 
@@ -81,30 +123,65 @@
     const ceremony = document.getElementById('medalCeremony');
     const card = ceremony?.querySelector('.mc-card');
     const stage = ceremony?.querySelector('.mc-stage');
-    const p1 = document.getElementById('mcPlayer');
     const sub = document.getElementById('mcSub');
     const msg = document.getElementById('mcMessage');
     const banner = ceremony?.querySelector('.mc-banner');
-    if (!ceremony || !card || !stage || !p1) return false;
+    if (!ceremony || !card || !stage) return false;
+
+    // Do not reveal the ceremony until both competitors have real image sources.
+    ceremony.classList.remove('show');
+    ceremony.setAttribute('aria-hidden','true');
+
+    const seeded = seedPlayersFromHub();
+    let p1 = seeded.p1;
+    let p2 = seeded.p2;
+
+    if (!p1) return false;
+    if (!p2) {
+      p2 = p1.cloneNode(true);
+      p2.id = 'mcPlayer2';
+      stage.appendChild(p2);
+    }
+
+    const src = playerSources();
+    const p1src = seeded.p1src || src.p1;
+    const p2src = seeded.p2src || src.p2;
+
+    if (!p1src || !p2src) {
+      // Player-card images can finish initialising a fraction later in the iframe.
+      // Retry briefly instead of showing an empty podium.
+      let tries = 0;
+      const wait = setInterval(() => {
+        const s = seedPlayersFromHub();
+        if ((s.p1src && s.p2src) || ++tries >= 20) {
+          clearInterval(wait);
+          if (s.p1src && s.p2src) renderTieDirect();
+        }
+      }, 75);
+      return true;
+    }
 
     try { if (typeof clearCT === 'function') clearCT(); } catch (_) {}
     ceremony.querySelectorAll('.mc-piece').forEach(x => x.remove());
     card.classList.remove('award','celebrate','preview','gold');
     card.classList.add('piece','tie');
 
-    const src = playerSources();
-    if (src.p1) p1.src = src.p1;
+    p1.src = p1src;
     p1.alt = 'Player 1 — joint 1st place';
+    p1.style.removeProperty('display');
+    p1.style.setProperty('visibility','visible','important');
 
-    let p2 = document.getElementById('mcPlayer2');
-    if (!p2) {
-      p2 = p1.cloneNode(true);
-      p2.id = 'mcPlayer2';
-      stage.appendChild(p2);
-    }
-    if (src.p2) p2.src = src.p2;
+    p2.src = p2src;
     p2.alt = 'Player 2 — joint 1st place';
     p2.style.setProperty('display','block','important');
+    p2.style.setProperty('visibility','visible','important');
+
+    // Restart the entrance animations every time a tie ceremony opens.
+    p1.style.animation = 'none';
+    p2.style.animation = 'none';
+    void p1.offsetWidth;
+    p1.style.removeProperty('animation');
+    p2.style.removeProperty('animation');
 
     if (banner) banner.textContent = '🏅 2-PLAYER MATCH AWARD 🏅';
     if (sub) sub.textContent = 'Standalone 2-player match';
@@ -127,7 +204,7 @@
   function install(){
     const base = window.showMedalCeremony;
     if (typeof base !== 'function') return false;
-    if (base.__sfTieDirectV3) return true;
+    if (base.__sfTieDirectV4) return true;
 
     const wrapped = function(preview=false, winner='p1', kind='gold'){
       if (winner === 'tie' && kind === 'piece') {
@@ -135,7 +212,7 @@
       }
       return base.apply(this, arguments);
     };
-    wrapped.__sfTieDirectV3 = true;
+    wrapped.__sfTieDirectV4 = true;
     window.showMedalCeremony = wrapped;
     return true;
   }
