@@ -76,6 +76,69 @@
     }
   }
 
+  // Practice 8 (Water Polo): both capacity answer boxes must be completed.
+  // If a unit is absent, pupils must enter 0 rather than leaving its box blank.
+  if(id===8){
+    const requiredMessage='Fill in both blanks. Type 0 if there are no litres or no millilitres.';
+
+    function visibleAnswerInputs(){
+      return [...document.querySelectorAll('input')].filter(el=>{
+        const type=(el.getAttribute('type')||'text').toLowerCase();
+        if(['hidden','button','submit','reset','checkbox','radio'].includes(type))return false;
+        if(el.disabled||el.readOnly)return false;
+        const style=getComputedStyle(el);
+        return style.display!=='none'&&style.visibility!=='hidden'&&el.getClientRects().length>0;
+      }).slice(0,2);
+    }
+
+    function prepareInputs(){
+      const fields=visibleAnswerInputs();
+      if(fields.length!==2)return fields;
+      fields.forEach(field=>{
+        field.required=true;
+        field.setAttribute('aria-required','true');
+        if(!field.dataset.sfRequiredClear){
+          field.dataset.sfRequiredClear='1';
+          field.addEventListener('input',()=>field.setCustomValidity(''));
+        }
+      });
+      return fields;
+    }
+
+    function blockIfIncomplete(event){
+      const fields=prepareInputs();
+      if(fields.length!==2)return false;
+      const missing=fields.find(field=>field.value.trim()==='');
+      if(!missing)return false;
+      if(event){
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation?.();
+      }
+      fields.forEach(field=>field.setCustomValidity(''));
+      missing.setCustomValidity(requiredMessage);
+      missing.focus();
+      missing.reportValidity();
+      return true;
+    }
+
+    document.addEventListener('click',event=>{
+      const button=event.target.closest?.('button,input[type="button"],input[type="submit"]');
+      if(!button)return;
+      const label=(button.textContent||button.value||'').trim().toLowerCase();
+      if(label.includes('check answer'))blockIfIncomplete(event);
+    },true);
+
+    document.addEventListener('keydown',event=>{
+      if(event.key==='Enter'&&visibleAnswerInputs().includes(event.target))blockIfIncomplete(event);
+    },true);
+
+    const observer=new MutationObserver(()=>prepareInputs());
+    observer.observe(document.documentElement,{childList:true,subtree:true});
+    if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',prepareInputs,{once:true});
+    else prepareInputs();
+  }
+
   // Practice 11: keep route distances believable for a school Sports Fiesta.
   if(id===11&&typeof qRouteCompare==='function'){
     qRouteCompare=function(){
