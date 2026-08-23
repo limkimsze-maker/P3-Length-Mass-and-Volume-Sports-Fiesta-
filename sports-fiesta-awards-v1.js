@@ -17,7 +17,6 @@
   }
 
   // Practice 11 display rule: keep each answer value and its ml unit together.
-  // This prevents displays such as "900" at the end of one line and "ml" on the next.
   if (PRACTICE_ID === 11) {
     const style = document.createElement('style');
     style.textContent = '.sf-unit-pair{display:inline-flex;align-items:center;gap:7px;white-space:nowrap}';
@@ -58,7 +57,7 @@
 
   // Shared mastery/fair-play rule for Practices 1–11.
   const retryScript = document.createElement('script');
-  retryScript.src = HUB_URL + 'sports-fiesta-retry-v1.js?v=20260823d';
+  retryScript.src = HUB_URL + 'sports-fiesta-retry-v1.js?v=20260823e';
   retryScript.dataset.practice = String(PRACTICE_ID);
   retryScript.async = false;
   document.head.appendChild(retryScript);
@@ -103,6 +102,23 @@
     return null;
   }
 
+  function attemptStats() {
+    const x = window.__sportsFiestaAttemptStats;
+    if (!x) return null;
+    const c1 = Number(x.correct?.[0]), c2 = Number(x.correct?.[1]);
+    const w1 = Number(x.wrong?.[0]), w2 = Number(x.wrong?.[1]);
+    if (![c1,c2,w1,w2].every(Number.isFinite)) return null;
+    return {c1,c2,w1,w2};
+  }
+
+  function attemptWinner() {
+    const a = attemptStats();
+    if (!a) return null;
+    if (a.c1 !== a.c2) return a.c1 > a.c2 ? 'p1' : 'p2';
+    if (a.w1 !== a.w2) return a.w1 < a.w2 ? 'p1' : 'p2';
+    return 'tie';
+  }
+
   function readState(gm) {
     const accuracy = accuracyScores();
     const competition = competitionScores();
@@ -138,28 +154,23 @@
       };
     }
 
-    // Practice 11: the Torch Relay winner is determined strictly by the actual
-    // correct-answer scores. This must take priority over any shared fair-play
-    // value so Player 2 cannot be replaced by Player 1 in the medal ceremony.
-    if (PRACTICE_ID === 11 && s.c1 != null && s.c2 != null) {
-      return {
-        winner: s.c1 === s.c2 ? 'tie' : (s.c1 > s.c2 ? 'p1' : 'p2'),
-        perfect: false
-      };
+    // Practice 1 remains a true first-to-finish race.
+    if (PRACTICE_ID === 1) {
+      if (s.c1 == null || s.c2 == null) return {winner:'tie', perfect:false};
+      return {winner:s.c1===s.c2?'tie':(s.c1>s.c2?'p1':'p2'), perfect:false};
     }
 
-    // Practice 1 is a true first-to-finish race. Practices 2–10 are equal-turn games;
-    // the fair-play helper supplies p1, p2 or tie according to the number of mistakes.
+    // Practices 2–11 use one transparent rule everywhere:
+    // more correct attempts; if equal, fewer wrong attempts; if still equal, tie.
     const fairWinner = window.__sportsFiestaFairWinner;
-    if (PRACTICE_ID !== 1 && (fairWinner === 'p1' || fairWinner === 'p2' || fairWinner === 'tie')) {
+    if (fairWinner === 'p1' || fairWinner === 'p2' || fairWinner === 'tie') {
       return {winner: fairWinner, perfect:false};
     }
+    const trackedWinner = attemptWinner();
+    if (trackedWinner) return {winner:trackedWinner, perfect:false};
 
     if (s.c1 == null || s.c2 == null) return {winner:'tie', perfect:false};
-    return {
-      winner: s.c1 === s.c2 ? 'tie' : (s.c1 > s.c2 ? 'p1' : 'p2'),
-      perfect: false
-    };
+    return {winner:s.c1===s.c2?'tie':(s.c1>s.c2?'p1':'p2'), perfect:false};
   }
 
   function qualifiesOldRecord(x) {
@@ -190,13 +201,14 @@
     const winnerValue = gm === 2
       ? (outcome.winner === 'tie' ? 'tie' : (outcome.winner === 'p2' ? 2 : 1))
       : (old.lastWinner ?? 0);
+    const stats = attemptStats();
 
     data[PRACTICE_ID] = {
       ...old,
       completed: true,
       verified: true,
-      source: 'game-v5',
-      awardRules: 'v5-fair-two-player',
+      source: 'game-v6',
+      awardRules: 'v6-attempt-record',
       pieceEarned,
       awardQualified: pieceEarned,
       perfectSingle: !!old.perfectSingle || (gm === 1 && outcome.perfect),
@@ -205,7 +217,8 @@
       lastWinner: winnerValue,
       lastAwardWinner: qualifies
         ? (gm === 1 ? 1 : (outcome.winner === 'tie' ? 'tie' : (outcome.winner === 'p2' ? 2 : 1)))
-        : (old.lastAwardWinner ?? 0)
+        : (old.lastAwardWinner ?? 0),
+      lastAttemptStats: stats || old.lastAttemptStats || null
     };
 
     localStorage.setItem(HUB_KEY, JSON.stringify(data));
@@ -238,11 +251,12 @@
 
   function showCeremony(gm, outcome, progress) {
     const winner = gm === 1 ? 'p1' : outcome.winner;
+    const stats = attemptStats();
     const awardGoldNow = progress.qualifies && progress.piecesAfter === 11 && !goldAlreadyAwarded();
 
     const frame = document.createElement('iframe');
     frame.title = 'Sports Fiesta medal ceremony';
-    frame.src = HUB_URL + '?ceremonyBridge=award-v5&t=' + Date.now();
+    frame.src = HUB_URL + '?ceremonyBridge=award-v6&winner=' + encodeURIComponent(winner) + '&t=' + Date.now();
     Object.assign(frame.style, {
       position:'fixed', inset:'0', width:'100%', height:'100%',
       border:'0', zIndex:'2147483647', background:'#185b9d'
@@ -252,6 +266,7 @@
     frame.onload = () => {
       try {
         const w = frame.contentWindow, d = w.document;
+        w.__sportsFiestaBridgeWinner = winner;
         d.body.classList.remove('cover-on');
         const cover = d.getElementById('fiestaCover');
         if (cover) cover.style.display = 'none';
@@ -268,12 +283,16 @@
           const msg = d.getElementById('mcMessage');
           if (sub) sub.textContent = `Practice ${PRACTICE_ID} of 11 • ${SPORT}`;
           if (msg) {
+            const attemptLine = gm===2 && stats
+              ? ` Player 1: ${stats.c1} correct, ${stats.w1} wrong. Player 2: ${stats.c2} correct, ${stats.w2} wrong.`
+              : '';
             if (gm === 1) {
               msg.textContent = 'Perfect score! Player 1 earns a 1/11 medal!';
             } else if (winner === 'tie') {
-              msg.textContent = 'It is a tie! Player 1 and Player 2 both stand on the rostrum and both receive a 1/11 medal!';
+              msg.textContent = 'It is a tie! Player 1 and Player 2 both receive a 1/11 medal!' + attemptLine;
             } else {
-              msg.textContent = `${winner === 'p2' ? 'Player 2' : 'Player 1'} wins and earns a 1/11 medal!`;
+              const why = stats && stats.c1===stats.c2 && stats.w1!==stats.w2 ? ' with fewer wrong attempts' : '';
+              msg.textContent = `${winner === 'p2' ? 'Player 2' : 'Player 1'} wins${why} and earns a 1/11 medal!` + attemptLine;
             }
           }
         };
@@ -324,8 +343,8 @@
       handledResult = true;
 
       if (!progress.qualifies) return;
-      setTimeout(() => showCeremony(gm, outcome, progress), 250);
-    }, 180);
+      setTimeout(() => showCeremony(gm, outcome, progress), 350);
+    }, 220);
   }
 
   new MutationObserver(checkResult).observe(document.documentElement, {
