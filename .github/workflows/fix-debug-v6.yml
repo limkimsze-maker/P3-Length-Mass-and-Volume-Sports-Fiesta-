@@ -1,0 +1,192 @@
+name: Fix Sports Fiesta DEBUG V6
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Replace old cheat flow with real DEBUG fast-forward
+        env:
+          CACHE_KEY: ${{ github.sha }}
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import os, re
+
+          awards = Path('sports-fiesta-awards-v1.js')
+          s = awards.read_text(encoding='utf-8')
+
+          new_block = r'''  /* SF_DEBUG_V6 — teacher fast-forward using the SAME result/progress/ceremony functions. */
+  function debugStats(kind, total) {
+    if (kind === 'single') return {correct:[total,0], wrong:[0,0]};
+    if (kind === 'p1') return {correct:[10,7], wrong:[0,3]};
+    if (kind === 'p2') return {correct:[7,10], wrong:[3,0]};
+    return {correct:[8,8], wrong:[2,2]};
+  }
+
+  function showNormalDebugResult(gm, kind, total, stats) {
+    const result = document.getElementById('results');
+    if (!result) {
+      alert('DEBUG could not find the normal Results screen.');
+      return null;
+    }
+
+    const title = document.getElementById('resultTitle') || document.getElementById('rt') || result.querySelector('h1,h2,h3');
+    const text = document.getElementById('resultText') || document.getElementById('rr') || result.querySelector('p');
+
+    document.querySelectorAll('.screen.active,.page.active,.view.active').forEach(el => {
+      if (el !== result) el.classList.remove('active');
+    });
+    result.style.removeProperty('display');
+    result.style.removeProperty('visibility');
+    result.classList.add('active');
+
+    if (gm === 1) {
+      if (title) title.textContent = 'Perfect Score!';
+      if (text) text.innerHTML = `<b>Player 1 — Correct: ${total} / ${total}</b><br>Perfect score!`;
+    } else {
+      const winner = kind;
+      if (title) title.textContent = winner === 'tie' ? "It's a Tie!" : `Player ${winner === 'p2' ? 2 : 1} Wins!`;
+      if (text) text.innerHTML = `<b>Attempt record</b><br>Player 1 — Correct: <b>${stats.correct[0]}</b> &nbsp; Wrong: <b>${stats.wrong[0]}</b><br>Player 2 — Correct: <b>${stats.correct[1]}</b> &nbsp; Wrong: <b>${stats.wrong[1]}</b>`;
+    }
+    return result;
+  }
+
+  function runDebugFastForward(kind) {
+    const gm = getMode();
+    if (gm === 1) kind = 'single';
+    if (gm === 2 && !['p1','p2','tie'].includes(kind)) return;
+
+    const total = Math.max(1, Number(questionTotal()) || 12);
+    const stats = debugStats(kind, total);
+    window.__sportsFiestaAttemptStats = stats;
+    if (gm === 2) window.__sportsFiestaFairWinner = kind;
+
+    const result = showNormalDebugResult(gm, kind, total, stats);
+    if (!result) return;
+
+    document.getElementById('sfCeremonyNext')?.remove();
+    document.getElementById('sfCeremonyNextWrap')?.remove();
+
+    const outcome = gm === 1
+      ? {winner:'p1', perfect:true, score:total, total}
+      : {winner:kind, perfect:false};
+
+    /* These are the exact same two functions used by checkResult() after a pupil
+       genuinely completes the practice. DEBUG only skips the answering. */
+    handledResult = true;
+    const progress = updateProgress(gm, outcome);
+    addCeremonyNextButton(gm, outcome, progress);
+
+    if (gm === 2) {
+      [0,60,160,320].forEach(ms => setTimeout(() => { window.__sportsFiestaFairWinner = kind; }, ms));
+    }
+  }
+
+  function installDebugPanel() {
+    document.getElementById('sfFlowCheatPanel')?.remove();
+    if (document.getElementById('sfDebugPanelV6')) return;
+
+    const style = document.createElement('style');
+    style.id = 'sfDebugStyleV6';
+    style.textContent = `
+      #sfDebugPanelV6{position:fixed;right:12px;bottom:12px;z-index:2147483003;font-family:"Trebuchet MS",Arial,sans-serif;display:flex;gap:7px;align-items:flex-end;justify-content:flex-end;flex-wrap:wrap;max-width:min(700px,95vw)}
+      #sfDebugPanelV6 button{border:2px solid #fff;border-radius:13px;padding:9px 12px;font-size:12px;font-weight:1000;cursor:pointer;box-shadow:0 5px 16px rgba(0,0,0,.25)}
+      #sfDebugUnlockV6{background:#5c2aa6;color:#fff;border-radius:999px!important}
+      #sfDebugChoicesV6{display:none;gap:7px;flex-wrap:wrap;justify-content:flex-end;background:rgba(255,255,255,.97);border:3px solid #d8c8ff;border-radius:16px;padding:8px}
+      #sfDebugPanelV6.unlocked #sfDebugChoicesV6{display:flex}#sfDebugPanelV6.unlocked #sfDebugUnlockV6{display:none}
+      .sfDebugSingleV6{background:#ffe272;color:#5d4300}.sfDebugP1V6{background:#dcecff;color:#144e88}.sfDebugP2V6{background:#ffe0e5;color:#8b2638}.sfDebugTieV6{background:#e6f7e8;color:#246b31}.sfDebugLockV6{background:#eef1f5;color:#53606d}
+      @media(max-width:600px){#sfDebugPanelV6{right:7px;bottom:7px}#sfDebugPanelV6 button{padding:7px 9px;font-size:10px}#sfDebugChoicesV6{gap:5px;padding:6px}}
+    `;
+    document.head.appendChild(style);
+
+    const panel = document.createElement('div');
+    panel.id = 'sfDebugPanelV6';
+    panel.innerHTML = `<button id="sfDebugUnlockV6" type="button">DEBUG</button><div id="sfDebugChoicesV6"></div>`;
+    document.body.appendChild(panel);
+
+    let unlocked = false;
+    const choices = panel.querySelector('#sfDebugChoicesV6');
+    const render = () => {
+      if (!unlocked) { panel.classList.remove('unlocked'); choices.innerHTML=''; return; }
+      panel.classList.add('unlocked');
+      if (getMode() === 2) {
+        choices.innerHTML = `<button class="sfDebugP1V6" data-sf-debug-v6="p1">Player 1 Wins</button><button class="sfDebugP2V6" data-sf-debug-v6="p2">Player 2 Wins</button><button class="sfDebugTieV6" data-sf-debug-v6="tie">Tie</button><button class="sfDebugLockV6" data-sf-debug-lock-v6>🔒</button>`;
+      } else {
+        choices.innerHTML = `<button class="sfDebugSingleV6" data-sf-debug-v6="single">Player 1 Cheat Solve</button><button class="sfDebugLockV6" data-sf-debug-lock-v6>🔒</button>`;
+      }
+    };
+
+    panel.querySelector('#sfDebugUnlockV6').onclick = () => {
+      const entered = prompt('DEBUG password');
+      if (entered === null) return;
+      if (entered !== '67') { alert('Incorrect password.'); return; }
+      unlocked = true;
+      render();
+    };
+
+    choices.addEventListener('click', e => {
+      if (e.target.closest('[data-sf-debug-lock-v6]')) { unlocked=false; render(); return; }
+      const btn = e.target.closest('[data-sf-debug-v6]');
+      if (btn) runDebugFastForward(btn.dataset.sfDebugV6);
+    });
+
+    let lastMode = getMode();
+    setInterval(() => {
+      document.getElementById('sfFlowCheatPanel')?.remove();
+      const now = getMode();
+      if (now !== lastMode) { lastMode = now; render(); }
+    }, 250);
+  }
+
+  window.__sportsFiestaDebugFastForwardV6 = runDebugFastForward;
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', installDebugPanel, {once:true});
+  else installDebugPanel();
+
+'''
+
+          pattern = re.compile(r"  /\* SF_FLOW_CHEAT_V2[\s\S]*?(?=  function addCeremonyNextButton\()")
+          s2, n = pattern.subn(new_block, s, count=1)
+          if n != 1:
+              raise SystemExit(f'Expected one old cheat block, replaced {n}')
+
+          # Fresh retry controller, and make its ceremony hold 2-player only.
+          s2 = re.sub(r"sports-fiesta-retry-v1\.js\?v=[^'\"]+", "sports-fiesta-retry-v1.js?v=20260823debugv6", s2)
+          awards.write_text(s2, encoding='utf-8')
+
+          retry = Path('sports-fiesta-retry-v1.js')
+          r = retry.read_text(encoding='utf-8')
+          old = "if(!frame || ceremonyAllowed) return;"
+          new = "if(!frame || ceremonyAllowed || getMode()!==2) return;"
+          if old not in r:
+              raise SystemExit('Retry ceremony guard target not found')
+          retry.write_text(r.replace(old,new,1), encoding='utf-8')
+
+          # Force every embedded practice to fetch the new awards bridge and remove
+          # the obsolete helper that used to intercept CHEAT SOLVE.
+          index = Path('index.html')
+          h = index.read_text(encoding='utf-8')
+          version = os.environ.get('CACHE_KEY','debugv6')[:12]
+          h = re.sub(r'(sports-fiesta-awards-v1\.js)(?:\?[^"\']*)?', rf'\1?v={version}', h)
+          h = re.sub(r'\s*<script\b[^>]*src=["\'][^"\']*sports-fiesta-cheat-flow-v2\.js(?:\?[^"\']*)?["\'][^>]*></script>', '', h)
+          index.write_text(h, encoding='utf-8')
+          PY
+          node --check sports-fiesta-awards-v1.js
+          node --check sports-fiesta-retry-v1.js
+      - name: Commit DEBUG V6
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add sports-fiesta-awards-v1.js sports-fiesta-retry-v1.js index.html
+          git commit -m "Replace CHEAT SOLVE with real DEBUG flow"
+          git push
