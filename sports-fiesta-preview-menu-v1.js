@@ -1,8 +1,8 @@
 (() => {
-  if (window.__sportsFiestaAllPreviewMenuV2) return;
-  window.__sportsFiestaAllPreviewMenuV2 = true;
+  if (window.__sportsFiestaAllPreviewMenuV3) return;
+  window.__sportsFiestaAllPreviewMenuV3 = true;
 
-  const STYLE_ID = 'sfAllPreviewStyleV2';
+  const STYLE_ID = 'sfAllPreviewStyleV3';
   const PASS_ID = 'sfAllPreviewPassV1';
   const MENU_ID = 'sfAllPreviewMenuV1';
 
@@ -72,6 +72,45 @@
     return true;
   }
 
+  function replaceCongratulatoryText(root, winner) {
+    if (!root) return false;
+    const wanted = wellDoneFor(winner);
+    const p1Patterns = [
+      /Well\s*done\s*,?\s*Player\s*1\s*[.!]?/gi,
+      /Congratulations\s*,?\s*(?:to\s+)?Player\s*1\s*[.!]?/gi,
+      /Great\s*job\s*,?\s*Player\s*1\s*[.!]?/gi,
+      /Excellent\s*,?\s*Player\s*1\s*[.!]?/gi
+    ];
+    const p2Patterns = [
+      /Well\s*done\s*,?\s*Player\s*2\s*[.!]?/gi,
+      /Congratulations\s*,?\s*(?:to\s+)?Player\s*2\s*[.!]?/gi,
+      /Great\s*job\s*,?\s*Player\s*2\s*[.!]?/gi,
+      /Excellent\s*,?\s*Player\s*2\s*[.!]?/gi
+    ];
+    const patterns = winner === 'p2' ? p1Patterns : (winner === 'tie' ? [...p1Patterns, ...p2Patterns] : []);
+    if (!patterns.length) return false;
+
+    let changed = false;
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    const nodes = [];
+    while (walker.nextNode()) nodes.push(walker.currentNode);
+    for (const node of nodes) {
+      let text = node.nodeValue || '';
+      let next = text;
+      for (const re of patterns) next = next.replace(re, wanted);
+      if (next !== text) {
+        node.nodeValue = next;
+        changed = true;
+      }
+    }
+    return changed;
+  }
+
+  function enforceWinnerEverywhere(winner, preserveScoreLines = false) {
+    setWinnerMessage(winner, preserveScoreLines);
+    replaceCongratulatoryText(document.getElementById('medalCeremony'), winner);
+  }
+
   function bridgeResult() {
     try {
       const p = new URLSearchParams(location.search);
@@ -86,25 +125,25 @@
     const winner = bridgeResult();
     if (!winner) return;
 
-    const enforce = () => setWinnerMessage(winner, true);
-    [0,40,100,220,450,800,1300,2100,3200,5000].forEach(ms => setTimeout(enforce, ms));
+    const enforce = () => enforceWinnerEverywhere(winner, true);
+    [0,40,100,220,450,800,1300,2100,3200,5000,7000,10000,12000].forEach(ms => setTimeout(enforce, ms));
 
     let observed = null;
     let attempts = 0;
     const findTimer = setInterval(() => {
-      const msg = document.getElementById('mcMessage');
-      if (msg && msg !== observed) {
-        observed = msg;
+      const ceremony = document.getElementById('medalCeremony');
+      if (ceremony && ceremony !== observed) {
+        observed = ceremony;
         let busy = false;
         new MutationObserver(() => {
           if (busy) return;
           busy = true;
           enforce();
           busy = false;
-        }).observe(msg, {subtree:true, childList:true, characterData:true});
+        }).observe(ceremony, {subtree:true, childList:true, characterData:true});
         enforce();
       }
-      if (++attempts > 100) clearInterval(findTimer);
+      if (++attempts > 260) clearInterval(findTimer);
     }, 50);
   }
 
@@ -115,11 +154,18 @@
     return 'Well done, Player 1.';
   }
 
+  function scenarioWinner(scenario) {
+    if (scenario === 'p2-win') return 'p2';
+    if (scenario === 'tie') return 'tie';
+    return 'p1';
+  }
+
   function setPreviewMessage(scenario) {
     const msg = document.getElementById('mcMessage');
     if (!msg) return false;
     const wanted = previewMessageFor(scenario);
     if ((msg.textContent || '').trim() !== wanted) msg.textContent = wanted;
+    replaceCongratulatoryText(document.getElementById('medalCeremony'), scenarioWinner(scenario));
     return true;
   }
 
@@ -140,16 +186,16 @@
         clearInterval(findTimer);
         return;
       }
-      const msg = document.getElementById('mcMessage');
-      if (msg && msg !== observed) {
-        observed = msg;
+      const ceremony = document.getElementById('medalCeremony');
+      if (ceremony && ceremony !== observed) {
+        observed = ceremony;
         let busy = false;
         new MutationObserver(() => {
           if (busy || window.__sfPreviewMessageGuardToken !== token) return;
           busy = true;
           enforce();
           busy = false;
-        }).observe(msg, {subtree:true, childList:true, characterData:true});
+        }).observe(ceremony, {subtree:true, childList:true, characterData:true});
         enforce();
       }
       if (++attempts > 260) clearInterval(findTimer);
@@ -182,6 +228,7 @@
       sub.textContent = 'Teacher preview • all 11 practices completed perfectly';
       msg.textContent = '🏆 GOLD MEDAL CHAMPION — Well done, Player 1. 🏆';
     }
+    replaceCongratulatoryText(document.getElementById('medalCeremony'), scenarioWinner(scenario));
   }
 
   function playScenario(scenario) {
