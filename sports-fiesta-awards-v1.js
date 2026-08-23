@@ -52,6 +52,8 @@
     catch (_) { return {}; }
   }
 
+  // Snapshot the complete pre-game record. This is the protected 1-player record
+  // that a later 2-player match is not allowed to overwrite.
   let preservedSingleRecord = {...(readHubData()[PRACTICE_ID] || {})};
 
   const retryScript = document.createElement('script');
@@ -181,7 +183,21 @@
     }else{
       const protectedRecord=preservedSingleRecord||{};
       const singlePerfect=qualifiesGoldRecord(protectedRecord);
-      data[PRACTICE_ID]={...old,completed:protectedRecord.completed??old.completed??false,singlePlayerCompleted:protectedRecord.singlePlayerCompleted??old.singlePlayerCompleted??false,singlePlayerPerfect:protectedRecord.singlePlayerPerfect??protectedRecord.perfectSingle??false,singlePlayerBestScore:protectedRecord.singlePlayerBestScore??old.singlePlayerBestScore??null,singlePlayerTotal:protectedRecord.singlePlayerTotal??old.singlePlayerTotal??null,perfectSingle:!!(protectedRecord.perfectSingle||protectedRecord.singlePlayerPerfect),pieceEarned:singlePerfect,awardQualified:singlePerfect,verified:protectedRecord.verified??old.verified??false,source:protectedRecord.source??old.source??'game-v8',awardRules:'v8-single-vs-duel-separated',updatedAt:protectedRecord.updatedAt??old.updatedAt??null,lastMode:protectedRecord.lastMode??0,lastWinner:protectedRecord.lastWinner??0,lastAwardWinner:protectedRecord.lastAwardWinner??0,twoPlayerLastWinner:outcome.winner,twoPlayerLastAttemptStats:stats,twoPlayerUpdatedAt:new Date().toISOString()};
+      // Restore the complete pre-match record, then append only separate 2-player
+      // history. This prevents any native per-game 2-player save from erasing a
+      // score, completion flag, timestamp or other field belonging to 1-player.
+      data[PRACTICE_ID]={
+        ...old,
+        ...protectedRecord,
+        pieceEarned:singlePerfect,
+        awardQualified:singlePerfect,
+        perfectSingle:!!(protectedRecord.perfectSingle||protectedRecord.singlePlayerPerfect),
+        singlePlayerPerfect:!!(protectedRecord.singlePlayerPerfect||protectedRecord.perfectSingle),
+        awardRules:'v8-single-vs-duel-separated',
+        twoPlayerLastWinner:outcome.winner,
+        twoPlayerLastAttemptStats:stats,
+        twoPlayerUpdatedAt:new Date().toISOString()
+      };
     }
 
     const piecesAfter=goldPieceCount(data);
