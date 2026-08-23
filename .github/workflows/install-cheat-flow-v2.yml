@@ -1,0 +1,53 @@
+name: Install Cheat Flow V2
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  install:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install helper after every awards bridge
+        env:
+          CACHE_KEY: ${{ github.sha }}
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import os, re
+
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+          version = os.environ.get('CACHE_KEY','latest')[:12]
+
+          # Remove older copies so every embedded practice receives exactly one fresh helper.
+          s = re.sub(r'\s*<script\b[^>]*\bsrc=["\'][^"\']*sports-fiesta-cheat-flow-v2\.js(?:\?[^"\']*)?["\'][^>]*></script>', '', s)
+
+          award = re.compile(r'(<script\b[^>]*\bsrc=["\'][^"\']*sports-fiesta-awards-v1\.js(?:\?[^"\']*)?["\'][^>]*></script>)')
+          count = 0
+          def add_helper(m):
+              global count
+              count += 1
+              return m.group(1) + f'\n<script src="sports-fiesta-cheat-flow-v2.js?v={version}"></script>'
+
+          updated = award.sub(add_helper, s)
+          if count == 0:
+              raise SystemExit('No sports-fiesta-awards-v1.js tags found')
+          p.write_text(updated, encoding='utf-8')
+          print(f'Installed cheat flow helper after {count} awards bridge tag(s).')
+          PY
+          node --check sports-fiesta-cheat-flow-v2.js
+      - name: Commit installed helper
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add index.html
+          git commit -m "Install cheat flow helper in all practices"
+          git push
