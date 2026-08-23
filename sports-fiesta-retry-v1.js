@@ -117,12 +117,6 @@
     const winner=m1===m2?'tie':(m1<m2?'p1':'p2');
     window.__sportsFiestaFairWinner=winner;
 
-    // The shared awards script reads competition scores. Give it a comparison value
-    // based only on mistakes, without changing the result text already produced by the game.
-    const fair1=1000-m1, fair2=1000-m2;
-    try{ if(typeof scores!=='undefined' && Array.isArray(scores)){ scores[0]=fair1; scores[1]=fair2; } }catch(_){}
-    try{ if(typeof distances!=='undefined' && Array.isArray(distances)){ distances[0]=fair1; distances[1]=fair2; } }catch(_){}
-
     const title=document.getElementById('resultTitle') || document.getElementById('rt');
     const text=document.getElementById('resultText') || document.getElementById('rr');
     if(title){
