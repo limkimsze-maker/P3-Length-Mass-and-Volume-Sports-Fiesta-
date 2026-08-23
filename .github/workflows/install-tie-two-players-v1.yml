@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Refresh shared script cache tags
+      - name: Upgrade cheat flow and refresh cache tags
         env:
           CACHE_KEY: ${{ github.sha }}
         run: |
@@ -24,9 +24,107 @@ jobs:
           import os
           import re
 
+          version = os.environ.get('CACHE_KEY', 'latest')[:12]
+
+          # Upgrade the shared cheat buttons so they show a result screen first,
+          # then use the normal Next -> award ceremony route.
+          awards = Path('sports-fiesta-awards-v1.js')
+          a = awards.read_text(encoding='utf-8')
+          marker = '/* SF_FLOW_CHEAT_V2 */'
+          if marker not in a:
+              start = a.index('  function cheatFinish(kind) {')
+              end = a.index('  window.__sportsFiestaCheatFinish = cheatFinish;', start)
+              replacement = r'''  /* SF_FLOW_CHEAT_V2 */
+  function showCheatResult(kind, gm, outcome, progress, fake, previousStats) {
+    document.getElementById('sfCheatResultOverlay')?.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'sfCheatResultOverlay';
+    Object.assign(overlay.style, {
+      position:'fixed', inset:'0', zIndex:'2147483500',
+      display:'flex', alignItems:'center', justifyContent:'center', padding:'18px',
+      background:'rgba(12,42,75,.82)', backdropFilter:'blur(5px)'
+    });
+
+    const card = document.createElement('div');
+    Object.assign(card.style, {
+      width:'min(520px,94vw)', background:'#fff', color:'#17324d',
+      border:'5px solid #d9ecff', borderRadius:'26px', padding:'24px',
+      textAlign:'center', boxShadow:'0 24px 70px rgba(0,0,0,.32)',
+      fontFamily:'Trebuchet MS, Arial, sans-serif'
+    });
+
+    const total = Math.max(1, Number(questionTotal()) || 12);
+    let heading = 'Practice Complete!';
+    let resultLine = 'Well done, Player 1.';
+    let scoreHtml = `Player 1 — Correct: ${fake.correct[0]} / ${total}`;
+
+    if (kind === 'p1') {
+      heading = 'Player 1 Wins!';
+      resultLine = 'Well done, Player 1.';
+      scoreHtml = `Player 1 — Correct: ${fake.correct[0]} | Wrong: ${fake.wrong[0]}<br>Player 2 — Correct: ${fake.correct[1]} | Wrong: ${fake.wrong[1]}`;
+    } else if (kind === 'p2') {
+      heading = 'Player 2 Wins!';
+      resultLine = 'Well done, Player 2.';
+      scoreHtml = `Player 1 — Correct: ${fake.correct[0]} | Wrong: ${fake.wrong[0]}<br>Player 2 — Correct: ${fake.correct[1]} | Wrong: ${fake.wrong[1]}`;
+    } else if (kind === 'tie') {
+      heading = "It's a Tie!";
+      resultLine = 'Well done, both players!';
+      scoreHtml = `Player 1 — Correct: ${fake.correct[0]} | Wrong: ${fake.wrong[0]}<br>Player 2 — Correct: ${fake.correct[1]} | Wrong: ${fake.wrong[1]}`;
+    }
+
+    card.innerHTML = `
+      <div style="font-size:13px;font-weight:900;color:#6d35c7;margin-bottom:8px">🧪 FLOW TEST • PRACTICE ${PRACTICE_ID}</div>
+      <div style="font-size:clamp(28px,6vw,42px);font-weight:1000;margin:4px 0 8px">${heading}</div>
+      <div style="font-size:20px;font-weight:1000;color:#267044;margin-bottom:14px">${resultLine}</div>
+      <div style="font-size:17px;font-weight:800;line-height:1.65;background:#f4f8fc;border-radius:16px;padding:13px 15px;margin:0 auto 18px">${scoreHtml}</div>
+      <button id="sfCheatNext" type="button" style="min-width:170px;border:0;border-radius:15px;padding:13px 22px;background:#f4c542;color:#4b3700;font-size:20px;font-weight:1000;cursor:pointer;box-shadow:0 5px 0 #c99d22">Next →</button>`;
+    overlay.appendChild(card);
+    document.body.appendChild(overlay);
+
+    card.querySelector('#sfCheatNext').onclick = () => {
+      const btn = card.querySelector('#sfCheatNext');
+      btn.disabled = true;
+      overlay.remove();
+      showCeremony(gm, outcome, progress);
+      setTimeout(() => {
+        if (window.__sportsFiestaAttemptStats === fake) {
+          if (previousStats == null) delete window.__sportsFiestaAttemptStats;
+          else window.__sportsFiestaAttemptStats = previousStats;
+        }
+      }, 0);
+    };
+  }
+
+  function cheatFinish(kind) {
+    if (!['single','p1','p2','tie'].includes(kind)) return;
+    if (document.querySelector('iframe[title="Sports Fiesta medal ceremony"]')) return;
+    if (document.getElementById('sfCheatResultOverlay')) return;
+
+    const total = Math.max(1, Number(questionTotal()) || 12);
+    const fake = cheatStats(kind, total);
+    const previousStats = window.__sportsFiestaAttemptStats;
+    window.__sportsFiestaAttemptStats = fake;
+
+    let gm, outcome;
+    if (kind === 'single') {
+      gm = 1;
+      outcome = {winner:'p1', perfect:true, score:total, total};
+    } else {
+      gm = 2;
+      outcome = {winner:kind, perfect:false};
+    }
+
+    handledResult = true;
+    const progress = updateProgress(gm, outcome);
+    showCheatResult(kind, gm, outcome, progress, fake, previousStats);
+  }
+'''
+              a = a[:start] + replacement + a[end:]
+              awards.write_text(a, encoding='utf-8')
+
           p = Path('index.html')
           s = p.read_text(encoding='utf-8')
-          version = os.environ.get('CACHE_KEY', 'latest')[:12]
           updated = s
 
           def refresh_file(text, filename):
@@ -49,11 +147,11 @@ jobs:
           node --check sports-fiesta-preview-menu-v1.js
           node --check tie-ceremony-two-players-v1.js
 
-      - name: Commit refreshed cache tags
+      - name: Commit refreshed scripts
         run: |
           if git diff --quiet; then exit 0; fi
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add index.html
-          git commit -m "Refresh Sports Fiesta shared scripts"
+          git add index.html sports-fiesta-awards-v1.js
+          git commit -m "Upgrade Sports Fiesta cheat flow"
           git push
