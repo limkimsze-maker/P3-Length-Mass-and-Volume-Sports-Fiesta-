@@ -21,7 +21,7 @@
 
   // Shared mastery rule for Practices 1–11: a wrong answer stays on the same question.
   const retryScript = document.createElement('script');
-  retryScript.src = HUB_URL + 'sports-fiesta-retry-v1.js?v=20260823a';
+  retryScript.src = HUB_URL + 'sports-fiesta-retry-v1.js?v=20260823b';
   retryScript.dataset.practice = String(PRACTICE_ID);
   retryScript.async = false;
   document.head.appendChild(retryScript);
