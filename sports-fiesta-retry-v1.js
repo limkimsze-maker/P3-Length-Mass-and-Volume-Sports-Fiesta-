@@ -7,6 +7,8 @@
 
   let cooling = false;
   const mistakes = window.__sportsFiestaMistakes = [0,0];
+  const correctAttempts = window.__sportsFiestaCorrectAttempts = [0,0];
+  window.__sportsFiestaAttemptStats = {correct:correctAttempts, wrong:mistakes};
   let fairResultApplied = false;
 
   function feedbackEl(){
@@ -23,16 +25,28 @@
     try{ if(typeof player!=='undefined') return Number(player)===1?1:0; }catch(_){}
     return Number(fallback)===1?1:0;
   }
-  function resetMistakes(){
+  function resetAttempts(){
     mistakes[0]=0; mistakes[1]=0;
+    correctAttempts[0]=0; correctAttempts[1]=0;
     fairResultApplied=false;
     window.__sportsFiestaFairWinner=null;
   }
   function recordMistake(pi=activePlayerIndex()){
-    // Practice 1 is a true race: first player to the finish wins, so mistakes do not decide the winner.
-    if(practice===1 || getMode()!==2) return;
+    if(getMode()!==2) return;
     const idx=Number(pi)===1?1:0;
     mistakes[idx]=(Number(mistakes[idx])||0)+1;
+  }
+  function recordCorrect(pi=activePlayerIndex()){
+    if(getMode()!==2) return;
+    const idx=Number(pi)===1?1:0;
+    correctAttempts[idx]=(Number(correctAttempts[idx])||0)+1;
+  }
+  function winnerFromAttempts(){
+    const c1=Number(correctAttempts[0])||0, c2=Number(correctAttempts[1])||0;
+    const m1=Number(mistakes[0])||0, m2=Number(mistakes[1])||0;
+    if(c1!==c2) return c1>c2?'p1':'p2';
+    if(m1!==m2) return m1<m2?'p1':'p2';
+    return 'tie';
   }
   function hideNext(){
     const ids=['nextBtn','next'];
@@ -71,6 +85,11 @@
   function wrongFieldPresent(){
     return !!document.querySelector('input.answerInput.wrong,input.blank.wrong');
   }
+  function correctSignal(){
+    const f=(feedbackEl()?.textContent||'').toLowerCase();
+    if(/correct|success|well done|great/.test(f)) return true;
+    return !wrongFieldPresent() && !!document.querySelector('input.answerInput.correct,input.blank.correct,.choiceBtn.correct,.ans.ok,.ans.correct');
+  }
   function standardRetry(delay=480){
     setAnsweredFalse();
     hideNext();
@@ -99,63 +118,51 @@
     return result;
   }
 
-  // Each new game starts with a clean mistake count.
+  // Each new game starts with clean attempt totals.
   wrap('restart',original=>function(){
-    resetMistakes();
+    resetAttempts();
     return original.apply(this,arguments);
   });
 
-  // For turn-taking games (Practices 2–11), equal turns are already built into the games.
-  // Most practices use fewer mistakes as the fair-play tiebreak/result rule.
-  // Practice 11 already tracks each player's correct-answer score directly, so its
-  // displayed winner must come from those scores and must not be overwritten by mistake counts.
+  // All 2-player result screens show the same transparent attempt breakdown.
+  // Practice 1 keeps its true race winner. Practices 2–11 use:
+  // more correct attempts -> fewer wrong attempts -> tie.
   function applyFairTurnTakingResult(){
-    if(practice===1 || getMode()!==2 || fairResultApplied) return;
+    if(getMode()!==2 || fairResultApplied) return;
     const results=document.getElementById('results');
     if(!results || !results.classList.contains('active')) return;
 
+    fairResultApplied=true;
+    const c1=Number(correctAttempts[0])||0, c2=Number(correctAttempts[1])||0;
+    const m1=Number(mistakes[0])||0, m2=Number(mistakes[1])||0;
     const title=document.getElementById('resultTitle') || document.getElementById('rt');
     const text=document.getElementById('resultText') || document.getElementById('rr');
 
-    if(practice===11){
-      let a=null,b=null;
-      try{
-        if(typeof scores!=='undefined' && Array.isArray(scores)){
-          a=Number(scores[0]);
-          b=Number(scores[1]);
-        }
-      }catch(_){}
-
-      if(Number.isFinite(a) && Number.isFinite(b)){
-        fairResultApplied=true;
-        const winner=a===b?'tie':(a>b?'p1':'p2');
-        window.__sportsFiestaFairWinner=winner;
-        if(title){
-          title.textContent=winner==='tie' ? "It's a Tie!" : `Player ${winner==='p2'?2:1} Wins the Relay!`;
-        }
-        if(text){
-          text.innerHTML=`Player 1 correct answers: <b>${a}</b><br>Player 2 correct answers: <b>${b}</b><br><br>`+
-            (winner==='tie'
-              ? 'Both players have the same number of correct answers.'
-              : `Player ${winner==='p2'?2:1} has more correct answers and wins the relay.`);
-        }
-        return;
+    if(practice===1){
+      // Running Race remains first-to-finish. Do not replace its winner.
+      if(text){
+        const existing=text.innerHTML;
+        text.innerHTML=existing+`<br><br><b>Attempt record</b><br>`+
+          `Player 1 — Correct: <b>${c1}</b> &nbsp; Wrong: <b>${m1}</b><br>`+
+          `Player 2 — Correct: <b>${c2}</b> &nbsp; Wrong: <b>${m2}</b>`;
       }
+      return;
     }
 
-    fairResultApplied=true;
-    const m1=Number(mistakes[0])||0, m2=Number(mistakes[1])||0;
-    const winner=m1===m2?'tie':(m1<m2?'p1':'p2');
+    const winner=winnerFromAttempts();
     window.__sportsFiestaFairWinner=winner;
-
     if(title){
       title.textContent=winner==='tie' ? "It's a Tie!" : `Player ${winner==='p2'?2:1} Wins!`;
     }
     if(text){
-      text.innerHTML=`Player 1 mistakes: <b>${m1}</b><br>Player 2 mistakes: <b>${m2}</b><br><br>`+
-        (winner==='tie'
-          ? 'Both players made the same number of mistakes. Both players win and receive the award.'
-          : `Player ${winner==='p2'?2:1} made fewer mistakes and wins the game.`);
+      const reason=winner==='tie'
+        ? 'Both players have the same correct and wrong attempt totals.'
+        : (c1!==c2
+          ? `Player ${winner==='p2'?2:1} wins with more correct attempts.`
+          : `Player ${winner==='p2'?2:1} wins with fewer wrong attempts.`);
+      text.innerHTML=`<b>Attempt record</b><br>`+
+        `Player 1 — Correct: <b>${c1}</b> &nbsp; Wrong: <b>${m1}</b><br>`+
+        `Player 2 — Correct: <b>${c2}</b> &nbsp; Wrong: <b>${m2}</b><br><br>${reason}`;
     }
   }
 
@@ -163,7 +170,6 @@
     subtree:true,childList:true,attributes:true,attributeFilter:['class','style']
   });
 
-  // Remove stale red/green field styling as soon as a pupil edits a retry.
   document.addEventListener('input',e=>{
     const t=e.target;
     if(t && t.matches && t.matches('input.answerInput,input.blank')){
@@ -191,6 +197,7 @@
       if(cooling) return;
       const result=original.apply(this,arguments);
       if(btn && btn.classList.contains('wrong')){
+        recordMistake(pi);
         try{ if(typeof pLocked!=='undefined' && Array.isArray(pLocked)) pLocked[pi]=false; }catch(_){}
         setAnsweredFalse();
         hideNext();
@@ -200,6 +207,8 @@
           b.disabled=b.classList.contains('wrong');
         });
         showRetryMessage(`❌ Player ${pi+1}, try this question again.`);
+      }else if(btn && (btn.classList.contains('correct') || btn.classList.contains('ok'))){
+        recordCorrect(pi);
       }
       return result;
     });
@@ -216,34 +225,41 @@
     }
     wrap('checkChoice',original=>async function(btn,value){
       if(cooling) return;
+      const pi=activePlayerIndex();
       document.querySelectorAll('.choiceBtn').forEach(b=>b.classList.remove('correct'));
       const result=await original.apply(this,arguments);
       if(btn && btn.classList.contains('wrong')){
-        recordMistake();
+        recordMistake(pi);
         setResolvedFalse(); hideNext(); showRetryMessage();
         document.querySelectorAll('.choiceBtn').forEach(b=>{
           b.classList.remove('correct','locked');
           b.disabled=b.classList.contains('wrong');
         });
         restartHardTimer();
+      }else if(btn && btn.classList.contains('correct')){
+        recordCorrect(pi);
       }
       return result;
     });
     wrap('checkInputs',original=>async function(){
       if(cooling) return;
+      const pi=activePlayerIndex();
       clearPreviousFieldMarks();
       const result=await original.apply(this,arguments);
       if(wrongFieldPresent()){
-        recordMistake();
+        recordMistake(pi);
         setResolvedFalse(); hideNext(); showRetryMessage();
         enableTextInputs(); restartHardTimer();
+      }else if(correctSignal()){
+        recordCorrect(pi);
       }
       return result;
     });
     wrap('onTimeUp',original=>async function(){
       if(cooling) return;
+      const pi=activePlayerIndex();
       const result=await original.apply(this,arguments);
-      recordMistake();
+      recordMistake(pi);
       setResolvedFalse(); hideNext();
       showRetryMessage("⏰ Time's up. Try this question again.");
       document.querySelectorAll('.choiceBtn').forEach(b=>b.disabled=false);
@@ -257,9 +273,10 @@
   if(practice===3){
     wrap('answer',original=>async function(btn,op){
       if(cooling) return;
+      const pi=activePlayerIndex();
       const result=await original.apply(this,arguments);
       if(btn && (btn.classList.contains('no') || btn.classList.contains('wrong'))){
-        recordMistake();
+        recordMistake(pi);
         setLockedFalse(); hideNext();
         const box=document.getElementById('answers');
         if(box) box.querySelectorAll('.ans').forEach(b=>{
@@ -267,6 +284,8 @@
           b.disabled=b===btn || b.classList.contains('no') || b.classList.contains('wrong');
         });
         showRetryMessage();
+      }else if(btn && (btn.classList.contains('ok') || btn.classList.contains('correct'))){
+        recordCorrect(pi);
       }
       return result;
     });
@@ -277,12 +296,15 @@
   if(practice>=4 && practice<=11){
     wrap('checkAnswer',original=>function(){
       if(cooling) return;
+      const pi=activePlayerIndex();
       clearPreviousFieldMarks();
       const result=original.apply(this,arguments);
       return afterMaybePromise(result,()=>{
         if(wrongFieldPresent()){
-          recordMistake();
+          recordMistake(pi);
           standardRetry(practice===7 || practice===8 ? 650 : 480);
+        }else if(correctSignal()){
+          recordCorrect(pi);
         }
       });
     });
