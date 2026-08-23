@@ -1,30 +1,26 @@
-/* SPORTS FIESTA AWARD UI V4 — 1/11 lesson medals, tie podium, Player 1 final gold */
+/* SPORTS FIESTA AWARD UI V5 — 1-player gold progress + standalone 2-player awards */
 (() => {
-  if (window.__sportsFiestaAwardUiV4) return;
-  window.__sportsFiestaAwardUiV4 = true;
+  if (window.__sportsFiestaAwardUiV5) return;
+  window.__sportsFiestaAwardUiV5 = true;
   const KEY = 'sportsFiestaHubProgress_v1';
   const PENDING = 'sportsFiestaPendingAward_v1';
 
-  function winnerQualified(x) {
-    const lm = Number(x?.lastMode), lw = x?.lastWinner;
-    return lm === 2 && (lw === 'p1' || lw === 'p2' || Number(lw) === 1 || Number(lw) === 2 || lw === 'tie');
-  }
-
-  function awardWinnerQualified(x) {
-    const lw = x?.lastAwardWinner;
-    return lw === 'p1' || lw === 'p2' || lw === 'tie' || Number(lw) === 1 || Number(lw) === 2;
-  }
-
+  // Only a perfect 1-player result contributes a lesson medal piece toward gold.
   function recordQualified(x) {
     if (!x || typeof x !== 'object') return false;
-    return x.perfectSingle === true || winnerQualified(x) || awardWinnerQualified(x) ||
-      (x.awardQualified === true && x.pieceEarned === true);
+    return x.perfectSingle === true || x.singlePlayerPerfect === true;
   }
 
   function readData() {
     let d = {};
     try { d = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (_) {}
     return d;
+  }
+
+  function pieceCountFrom(d) {
+    let pieces = 0;
+    for (let i = 1; i <= 11; i++) if (recordQualified(d[i])) pieces++;
+    return pieces;
   }
 
   function migrate() {
@@ -34,35 +30,46 @@
       const x = d[i];
       if (!x || typeof x !== 'object') continue;
       const qualified = recordQualified(x);
-      if (x.pieceEarned !== qualified || x.awardQualified !== qualified || x.awardRules !== 'v4-medal-only') {
+
+      // Remove any old 2-player contribution from the cumulative medal count,
+      // while leaving the saved 1-player record and separate twoPlayer* data intact.
+      if (x.pieceEarned !== qualified || x.awardQualified !== qualified || x.awardRules !== 'v8-single-vs-duel-separated') {
         x.pieceEarned = qualified;
         x.awardQualified = qualified;
-        x.awardRules = 'v4-medal-only';
+        x.singlePlayerPerfect = !!(x.singlePlayerPerfect || x.perfectSingle);
+        x.awardRules = 'v8-single-vs-duel-separated';
         d[i] = x;
         changed = true;
       }
     }
+
+    if (pieceCountFrom(d) < 11 && d.__finalGoldAwarded) {
+      delete d.__finalGoldAwarded;
+      changed = true;
+    }
+
     if (changed) {
       localStorage.setItem(KEY, JSON.stringify(d));
       if (typeof window.renderAll === 'function') setTimeout(() => window.renderAll(), 0);
     }
 
+    // Pending cumulative awards are 1-player only. A 2-player award is displayed
+    // directly by the standalone game and must never feed the gold-medal system.
     try {
       const raw = localStorage.getItem(PENDING);
       if (raw) {
         const p = JSON.parse(raw);
-        const qualifies = Number(p.mode) === 1 ? !!p.perfect : (p.winner === 'p1' || p.winner === 'p2' || p.winner === 'tie');
-        if (!qualifies) localStorage.removeItem(PENDING);
+        if (Number(p.mode) !== 1 || !p.perfect) localStorage.removeItem(PENDING);
       }
     } catch (_) { localStorage.removeItem(PENDING); }
   }
 
-  function latestRecord() {
+  function latestQualifiedRecord() {
     const d = readData();
     let best = null;
     for (let i = 1; i <= 11; i++) {
       const x = d[i];
-      if (!x || typeof x !== 'object') continue;
+      if (!recordQualified(x)) continue;
       const stamp = Date.parse(x.updatedAt || '') || 0;
       if (!best || stamp > best.stamp) best = { id:i, x, stamp };
     }
@@ -70,31 +77,25 @@
   }
 
   function pieceCount() {
-    const d = readData();
-    let pieces = 0;
-    for (let i = 1; i <= 11; i++) if (recordQualified(d[i])) pieces++;
-    return pieces;
+    return pieceCountFrom(readData());
   }
 
-  function latestWinner(latest) {
-    if (!latest) return 'p1';
-    const lm = Number(latest.x.lastMode);
-    const lw = latest.x.lastAwardWinner ?? latest.x.lastWinner;
-    if (lm === 1 && !awardWinnerQualified(latest.x)) return 'p1';
-    if (lw === 'tie') return 'tie';
-    if (Number(lw) === 2 || lw === 'p2') return 'p2';
-    return 'p1';
-  }
-
-  function explicitBridgeWinner(requestedWinner) {
+  function bridgeInfo(requestedWinner) {
     try {
       const params = new URLSearchParams(location.search);
       const bridge = params.get('ceremonyBridge') || '';
-      if (!bridge.startsWith('award-v6')) return null;
+      if (!/^award-v(?:6|7|8)/.test(bridge)) return {winner:null, mode:null};
       const candidates = [window.__sportsFiestaBridgeWinner, params.get('winner'), requestedWinner];
-      for (const x of candidates) if (x === 'p1' || x === 'p2' || x === 'tie') return x;
-    } catch (_) {}
-    return null;
+      let winner = null;
+      for (const x of candidates) {
+        if (x === 'p1' || x === 'p2' || x === 'tie') { winner = x; break; }
+      }
+      const modeRaw = Number(window.__sportsFiestaBridgeMode ?? params.get('mode'));
+      const mode = modeRaw === 2 ? 2 : (modeRaw === 1 ? 1 : null);
+      return {winner, mode};
+    } catch (_) {
+      return {winner:null, mode:null};
+    }
   }
 
   function renderTiePodium(base, ctx, preview, kind) {
@@ -145,26 +146,30 @@
 
   function installUiOverride() {
     const base = window.showMedalCeremony;
-    if (typeof base !== 'function' || base.__awardUiV4) return false;
+    if (typeof base !== 'function' || base.__awardUiV5) return false;
 
     const wrapped = function(preview = false, winner = 'p1', requestedKind = 'gold') {
       const requestedWinner = winner;
       if (!preview) migrate();
 
       let kind = requestedKind === 'piece' ? 'piece' : 'gold';
-      const latest = latestRecord();
-      const qualified = latest ? recordQualified(latest.x) : false;
+      const bridge = bridgeInfo(requestedWinner);
+      const standaloneTwoPlayer = !preview && kind === 'piece' && bridge.mode === 2 && !!bridge.winner;
+      const latest = latestQualifiedRecord();
+      const qualified = !!latest;
       const pieces = pieceCount();
 
       if (!preview) {
-        if (!qualified) return false;
-        if (kind === 'gold' && pieces < 11) kind = 'piece';
-        if (kind === 'gold') {
-          winner = 'p1';
+        if (standaloneTwoPlayer) {
+          // A 2-player match may show its winner ceremony regardless of the
+          // 1-player medal count, but it never changes that count or unlocks gold.
+          winner = bridge.winner;
+          kind = 'piece';
         } else {
-          // When a practice launches the ceremony through the award-v6 bridge,
-          // use its explicit final winner. Do not re-decide the winner here.
-          winner = explicitBridgeWinner(requestedWinner) || latestWinner(latest);
+          if (!qualified) return false;
+          if (kind === 'gold' && pieces < 11) kind = 'piece';
+          if (kind === 'gold') winner = 'p1';
+          else winner = bridge.winner || 'p1';
         }
       } else if (kind === 'gold') {
         winner = 'p1';
@@ -179,67 +184,84 @@
       const sub = document.getElementById('mcSub');
       const msg = document.getElementById('mcMessage');
 
-      if (banner) banner.textContent = kind === 'piece' ? '🏅 1/11 MEDAL AWARD 🏅' : '🏆 GOLD MEDAL CEREMONY 🏆';
+      if (banner) {
+        banner.textContent = standaloneTwoPlayer
+          ? '🏅 2-PLAYER MATCH AWARD 🏅'
+          : (kind === 'piece' ? '🏅 1/11 MEDAL AWARD 🏅' : '🏆 GOLD MEDAL CEREMONY 🏆');
+      }
       if (player && winner !== 'tie') player.alt = winner === 'p2' ? 'Player 2 on the rostrum' : 'Player 1 on the rostrum';
 
-      if (!preview && kind === 'piece') {
-        if (sub) sub.textContent = `${Math.min(pieces, 11)}/11 lesson medals earned`;
+      if (!preview && standaloneTwoPlayer) {
+        if (sub) sub.textContent = 'Standalone 2-player match — does not affect 1-player gold progress';
         if (msg) {
-          if (winner === 'tie') msg.textContent = 'It is a tie! Player 1 and Player 2 both receive a 1/11 medal on the rostrum!';
-          else if (winner === 'p2') msg.textContent = 'Player 2 wins this lesson and earns a 1/11 medal!';
-          else msg.textContent = 'Player 1 earns a 1/11 medal!';
+          if (winner === 'tie') msg.textContent = 'It is a tie! Player 1 and Player 2 both receive the match award!';
+          else msg.textContent = `${winner === 'p2' ? 'Player 2' : 'Player 1'} wins this match and receives the winner award!`;
         }
+      } else if (!preview && kind === 'piece') {
+        if (sub) sub.textContent = `${Math.min(pieces, 11)}/11 1-player lesson medals earned`;
+        if (msg) msg.textContent = 'Perfect 1-player score — Player 1 earns a 1/11 medal!';
       }
 
       if (!preview && kind === 'gold') {
-        if (sub) sub.textContent = 'All 11 Sports Fiesta lessons completed!';
+        if (sub) sub.textContent = 'All 11 Sports Fiesta practices completed perfectly in 1-player mode!';
         if (msg) msg.textContent = '🏆 Player 1 receives the Sports Fiesta GOLD MEDAL! 🏆';
       }
       return out;
     };
 
-    wrapped.__awardUiV4 = true;
+    wrapped.__awardUiV5 = true;
     window.showMedalCeremony = wrapped;
     return true;
   }
 
   function installRecordOverride() {
     if (!window.SportsFiestaAward || typeof window.SportsFiestaAward.record !== 'function') return false;
-    if (window.SportsFiestaAward.record.__awardRulesV4) return true;
+    if (window.SportsFiestaAward.record.__awardRulesV8) return true;
 
     const record = function(id, mode, winner, perfect) {
       id = Number(id); mode = Number(mode) || 1;
       if (!id) return;
       const d = readData();
       const old = d[id] || {};
-      const priorQualified = recordQualified(old);
-      const isTie = mode === 2 && winner === 'tie';
-      const winnerNum = winner === 'p2' ? 2 : winner === 'p1' ? 1 : 0;
-      const qualifies = mode === 1 ? !!perfect : (winnerNum > 0 || isTie);
-      const pieceEarned = priorQualified || qualifies;
 
+      if (mode === 2) {
+        // Standalone match history only. Do not touch the 1-player record or
+        // cumulative lesson-medal fields.
+        d[id] = {
+          ...old,
+          twoPlayerLastWinner: winner === 'tie' ? 'tie' : (winner === 'p2' ? 'p2' : 'p1'),
+          twoPlayerUpdatedAt: new Date().toISOString(),
+          awardRules: 'v8-single-vs-duel-separated'
+        };
+        localStorage.setItem(KEY, JSON.stringify(d));
+        localStorage.removeItem(PENDING);
+        return;
+      }
+
+      const nowPerfect = !!(old.perfectSingle || old.singlePlayerPerfect || perfect);
       d[id] = {
         ...old,
         completed: true,
-        pieceEarned,
-        awardQualified: pieceEarned,
-        perfectSingle: !!old.perfectSingle || (mode === 1 && !!perfect),
+        singlePlayerCompleted: true,
+        singlePlayerPerfect: nowPerfect,
+        perfectSingle: nowPerfect,
+        pieceEarned: nowPerfect,
+        awardQualified: nowPerfect,
         verified: true,
-        source: 'game-v6',
-        awardRules: 'v6-attempt-record',
+        source: 'game-v8',
+        awardRules: 'v8-single-vs-duel-separated',
         updatedAt: new Date().toISOString(),
-        lastMode: mode,
-        lastWinner: mode === 2 ? (isTie ? 'tie' : winnerNum) : (old.lastWinner ?? 0),
-        lastAwardWinner: qualifies ? (mode === 1 ? 1 : (isTie ? 'tie' : winnerNum)) : (old.lastAwardWinner ?? 0)
+        lastMode: 1,
+        lastAwardWinner: nowPerfect ? 1 : (old.lastAwardWinner ?? 0)
       };
 
       localStorage.setItem(KEY, JSON.stringify(d));
-      if (qualifies) {
+      if (perfect) {
         localStorage.setItem(PENDING, JSON.stringify({
           practiceId:id,
-          mode,
-          winner:mode===1?'p1':(isTie?'tie':winner),
-          perfect:!!perfect,
+          mode:1,
+          winner:'p1',
+          perfect:true,
           time:Date.now()
         }));
       } else {
@@ -247,7 +269,7 @@
       }
     };
 
-    record.__awardRulesV4 = true;
+    record.__awardRulesV8 = true;
     window.SportsFiestaAward.record = record;
     return true;
   }
