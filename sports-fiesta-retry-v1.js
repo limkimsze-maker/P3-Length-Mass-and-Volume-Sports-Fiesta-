@@ -16,8 +16,13 @@
     ids.forEach(id=>{
       const el=document.getElementById(id);
       if(!el) return;
-      el.classList.add('hidden');
-      el.style.display='none';
+      const usesInlineDisplay=el.classList.contains('next') || id==='next';
+      if(usesInlineDisplay){
+        el.style.display='none';
+      }else{
+        el.classList.add('hidden');
+        el.style.removeProperty('display');
+      }
       el.disabled=false;
     });
   }
