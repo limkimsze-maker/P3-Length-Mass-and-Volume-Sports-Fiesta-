@@ -332,6 +332,102 @@
     };
   }
 
+  /* SF_FLOW_CHEAT_V1 */
+  function cheatStats(kind, total) {
+    if (kind === 'single') return {correct:[total,0], wrong:[0,0]};
+    if (kind === 'p1') return {correct:[10,7], wrong:[0,3]};
+    if (kind === 'p2') return {correct:[7,10], wrong:[3,0]};
+    return {correct:[8,8], wrong:[2,2]};
+  }
+
+  function cheatFinish(kind) {
+    if (!['single','p1','p2','tie'].includes(kind)) return;
+    if (document.querySelector('iframe[title="Sports Fiesta medal ceremony"]')) return;
+
+    const total = Math.max(1, Number(questionTotal()) || 12);
+    const fake = cheatStats(kind, total);
+    const previousStats = window.__sportsFiestaAttemptStats;
+    window.__sportsFiestaAttemptStats = fake;
+
+    let gm, outcome;
+    if (kind === 'single') {
+      gm = 1;
+      outcome = {winner:'p1', perfect:true, score:total, total};
+    } else {
+      gm = 2;
+      outcome = {winner:kind, perfect:false};
+    }
+
+    try {
+      handledResult = true;
+      const progress = updateProgress(gm, outcome);
+      showCeremony(gm, outcome, progress);
+    } finally {
+      setTimeout(() => {
+        if (window.__sportsFiestaAttemptStats === fake) {
+          if (previousStats == null) delete window.__sportsFiestaAttemptStats;
+          else window.__sportsFiestaAttemptStats = previousStats;
+        }
+      }, 0);
+    }
+  }
+  window.__sportsFiestaCheatFinish = cheatFinish;
+
+  function installFlowCheatPanel() {
+    if (document.getElementById('sfFlowCheatPanel')) return;
+
+    const style = document.createElement('style');
+    style.id = 'sfFlowCheatStyle';
+    style.textContent = `
+      #sfFlowCheatPanel{position:fixed;right:12px;bottom:12px;z-index:2147483000;font-family:"Trebuchet MS",Arial,sans-serif;text-align:left}
+      #sfFlowCheatToggle{border:2px solid #fff;border-radius:999px;padding:9px 13px;background:#6d35c7;color:#fff;font-weight:1000;font-size:13px;box-shadow:0 5px 16px rgba(0,0,0,.28);cursor:pointer}
+      #sfFlowCheatMenu{display:none;width:min(268px,88vw);margin-top:8px;padding:12px;border:3px solid #d8c8ff;border-radius:17px;background:rgba(255,255,255,.98);box-shadow:0 12px 30px rgba(0,0,0,.28)}
+      #sfFlowCheatPanel.open #sfFlowCheatMenu{display:block}
+      #sfFlowCheatMenu strong{display:block;color:#4c268d;font-size:14px;margin-bottom:7px;text-align:center}
+      #sfFlowCheatMenu button{display:block;width:100%;margin:6px 0;border:0;border-radius:11px;padding:9px 10px;font-size:13px;font-weight:1000;cursor:pointer;box-shadow:0 3px 0 rgba(0,0,0,.14)}
+      #sfFlowCheatMenu button[data-sf-cheat="single"]{background:#ffe272;color:#5d4300}
+      #sfFlowCheatMenu button[data-sf-cheat="p1"]{background:#dcecff;color:#144e88}
+      #sfFlowCheatMenu button[data-sf-cheat="p2"]{background:#ffe0e5;color:#8b2638}
+      #sfFlowCheatMenu button[data-sf-cheat="tie"]{background:#e6f7e8;color:#246b31}
+      #sfFlowCheatMenu small{display:block;margin-top:8px;color:#667788;font-size:10px;line-height:1.3;text-align:center}
+      @media(max-width:600px){#sfFlowCheatPanel{right:7px;bottom:7px}#sfFlowCheatToggle{padding:7px 10px;font-size:11px}#sfFlowCheatMenu{width:min(235px,86vw);padding:9px}#sfFlowCheatMenu button{padding:7px 8px;font-size:11px;margin:5px 0}}
+    `;
+    document.head.appendChild(style);
+
+    const panel = document.createElement('div');
+    panel.id = 'sfFlowCheatPanel';
+    panel.innerHTML = `
+      <button id="sfFlowCheatToggle" type="button" aria-expanded="false">🧪 CHEAT SOLVE</button>
+      <div id="sfFlowCheatMenu">
+        <strong>FLOW TEST • PRACTICE ${PRACTICE_ID}</strong>
+        <button type="button" data-sf-cheat="single">👤 1 Player — P1 Perfect</button>
+        <button type="button" data-sf-cheat="p1">🔵 2 Players — P1 Wins</button>
+        <button type="button" data-sf-cheat="p2">🔴 2 Players — P2 Wins</button>
+        <button type="button" data-sf-cheat="tie">🤝 2 Players — Tie</button>
+        <small>Testing uses the real saved progress + award flow. The 1-player button records this practice as perfectly completed.</small>
+      </div>`;
+    document.body.appendChild(panel);
+
+    const toggle = panel.querySelector('#sfFlowCheatToggle');
+    toggle.addEventListener('click', () => {
+      const open = panel.classList.toggle('open');
+      toggle.setAttribute('aria-expanded', String(open));
+    });
+    panel.querySelectorAll('[data-sf-cheat]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        panel.classList.remove('open');
+        toggle.setAttribute('aria-expanded','false');
+        cheatFinish(btn.dataset.sfCheat);
+      });
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', installFlowCheatPanel, {once:true});
+  } else {
+    installFlowCheatPanel();
+  }
+
   function addCeremonyNextButton(gm, outcome, progress) {
     const result = document.getElementById('results');
     if (!result || !progress.qualifies) return;
