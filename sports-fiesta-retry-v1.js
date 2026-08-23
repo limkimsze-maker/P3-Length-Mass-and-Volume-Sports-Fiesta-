@@ -1,4 +1,4 @@
-/* Sports Fiesta shared mastery retry rule — Practices 1 to 11 */
+/* Sports Fiesta shared mastery retry + 2-player fair-play rule — Practices 1 to 11 */
 (() => {
   const script = document.currentScript;
   const practice = Number(script?.dataset?.practice || 0);
@@ -6,11 +6,34 @@
   window.__sportsFiestaRetryV1 = true;
 
   let cooling = false;
+  const mistakes = window.__sportsFiestaMistakes = [0,0];
+  let fairResultApplied = false;
 
   function feedbackEl(){
     return document.getElementById('feedback') || document.getElementById('fb');
   }
   function explainEl(){ return document.getElementById('explain'); }
+  function getMode(){
+    try{ if(typeof mode!=='undefined') return Number(mode)===2?2:1; }catch(_){}
+    try{ if(typeof gameMode!=='undefined') return String(gameMode).includes('2')?2:1; }catch(_){}
+    return 1;
+  }
+  function activePlayerIndex(fallback=0){
+    try{ if(typeof currentPlayer!=='undefined') return Number(currentPlayer)===1?1:0; }catch(_){}
+    try{ if(typeof player!=='undefined') return Number(player)===1?1:0; }catch(_){}
+    return Number(fallback)===1?1:0;
+  }
+  function resetMistakes(){
+    mistakes[0]=0; mistakes[1]=0;
+    fairResultApplied=false;
+    window.__sportsFiestaFairWinner=null;
+  }
+  function recordMistake(pi=activePlayerIndex()){
+    // Practice 1 is a true race: first player to the finish wins, so mistakes do not decide the winner.
+    if(practice===1 || getMode()!==2) return;
+    const idx=Number(pi)===1?1:0;
+    mistakes[idx]=(Number(mistakes[idx])||0)+1;
+  }
   function hideNext(){
     const ids=['nextBtn','next'];
     ids.forEach(id=>{
@@ -76,6 +99,47 @@
     return result;
   }
 
+  // Each new game starts with a clean mistake count.
+  wrap('restart',original=>function(){
+    resetMistakes();
+    return original.apply(this,arguments);
+  });
+
+  // For turn-taking games (Practices 2–11), equal turns are already built into the games.
+  // The fair winner is therefore the player who made fewer wrong attempts.
+  function applyFairTurnTakingResult(){
+    if(practice===1 || getMode()!==2 || fairResultApplied) return;
+    const results=document.getElementById('results');
+    if(!results || !results.classList.contains('active')) return;
+
+    fairResultApplied=true;
+    const m1=Number(mistakes[0])||0, m2=Number(mistakes[1])||0;
+    const winner=m1===m2?'tie':(m1<m2?'p1':'p2');
+    window.__sportsFiestaFairWinner=winner;
+
+    // The shared awards script reads competition scores. Give it a comparison value
+    // based only on mistakes, without changing the result text already produced by the game.
+    const fair1=1000-m1, fair2=1000-m2;
+    try{ if(typeof scores!=='undefined' && Array.isArray(scores)){ scores[0]=fair1; scores[1]=fair2; } }catch(_){}
+    try{ if(typeof distances!=='undefined' && Array.isArray(distances)){ distances[0]=fair1; distances[1]=fair2; } }catch(_){}
+
+    const title=document.getElementById('resultTitle') || document.getElementById('rt');
+    const text=document.getElementById('resultText') || document.getElementById('rr');
+    if(title){
+      title.textContent=winner==='tie' ? "It's a Tie!" : `Player ${winner==='p2'?2:1} Wins!`;
+    }
+    if(text){
+      text.innerHTML=`Player 1 mistakes: <b>${m1}</b><br>Player 2 mistakes: <b>${m2}</b><br><br>`+
+        (winner==='tie'
+          ? 'Both players made the same number of mistakes. Both players win and receive the award.'
+          : `Player ${winner==='p2'?2:1} made fewer mistakes and wins the game.`);
+    }
+  }
+
+  new MutationObserver(applyFairTurnTakingResult).observe(document.documentElement,{
+    subtree:true,childList:true,attributes:true,attributeFilter:['class','style']
+  });
+
   // Remove stale red/green field styling as soon as a pupil edits a retry.
   document.addEventListener('input',e=>{
     const t=e.target;
@@ -84,7 +148,7 @@
     }
   },true);
 
-  // Practice 1: Running Race — choice buttons, including the two-player panels.
+  // Practice 1: Running Race — first player to reach the finishing line wins.
   if(practice===1){
     wrap('soloAnswer',original=>function(btn,op){
       if(cooling) return;
@@ -132,6 +196,7 @@
       document.querySelectorAll('.choiceBtn').forEach(b=>b.classList.remove('correct'));
       const result=await original.apply(this,arguments);
       if(btn && btn.classList.contains('wrong')){
+        recordMistake();
         setResolvedFalse(); hideNext(); showRetryMessage();
         document.querySelectorAll('.choiceBtn').forEach(b=>{
           b.classList.remove('correct','locked');
@@ -146,6 +211,7 @@
       clearPreviousFieldMarks();
       const result=await original.apply(this,arguments);
       if(wrongFieldPresent()){
+        recordMistake();
         setResolvedFalse(); hideNext(); showRetryMessage();
         enableTextInputs(); restartHardTimer();
       }
@@ -154,6 +220,7 @@
     wrap('onTimeUp',original=>async function(){
       if(cooling) return;
       const result=await original.apply(this,arguments);
+      recordMistake();
       setResolvedFalse(); hideNext();
       showRetryMessage("⏰ Time's up. Try this question again.");
       document.querySelectorAll('.choiceBtn').forEach(b=>b.disabled=false);
@@ -169,6 +236,7 @@
       if(cooling) return;
       const result=await original.apply(this,arguments);
       if(btn && (btn.classList.contains('no') || btn.classList.contains('wrong'))){
+        recordMistake();
         setLockedFalse(); hideNext();
         const box=document.getElementById('answers');
         if(box) box.querySelectorAll('.ans').forEach(b=>{
@@ -189,7 +257,10 @@
       clearPreviousFieldMarks();
       const result=original.apply(this,arguments);
       return afterMaybePromise(result,()=>{
-        if(wrongFieldPresent()) standardRetry(practice===7 || practice===8 ? 650 : 480);
+        if(wrongFieldPresent()){
+          recordMistake();
+          standardRetry(practice===7 || practice===8 ? 650 : 480);
+        }
       });
     });
   }
