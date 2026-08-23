@@ -86,9 +86,18 @@
     return 'p1';
   }
 
+  function explicitBridgeWinner(requestedWinner) {
+    try {
+      const params = new URLSearchParams(location.search);
+      const bridge = params.get('ceremonyBridge') || '';
+      if (!bridge.startsWith('award-v6')) return null;
+      const candidates = [window.__sportsFiestaBridgeWinner, params.get('winner'), requestedWinner];
+      for (const x of candidates) if (x === 'p1' || x === 'p2' || x === 'tie') return x;
+    } catch (_) {}
+    return null;
+  }
+
   function renderTiePodium(base, ctx, preview, kind) {
-    // Capture Player 2's rendered image from the original ceremony, then rebuild
-    // the ceremony for Player 1 and place both athletes together on the rostrum.
     base.call(ctx, preview, 'p2', kind);
     const p2Rendered = document.getElementById('mcPlayer');
     const p2Src = p2Rendered?.getAttribute('src') || '';
@@ -139,6 +148,7 @@
     if (typeof base !== 'function' || base.__awardUiV4) return false;
 
     const wrapped = function(preview = false, winner = 'p1', requestedKind = 'gold') {
+      const requestedWinner = winner;
       if (!preview) migrate();
 
       let kind = requestedKind === 'piece' ? 'piece' : 'gold';
@@ -148,13 +158,14 @@
 
       if (!preview) {
         if (!qualified) return false;
-
-        // A lesson award is always shown as 1/11 first. Old callers that ask for
-        // a full gold too early are downgraded to a lesson medal. Full gold is
-        // valid only when all 11 lesson pieces have been earned.
         if (kind === 'gold' && pieces < 11) kind = 'piece';
-        if (kind === 'gold') winner = 'p1';
-        else winner = latestWinner(latest);
+        if (kind === 'gold') {
+          winner = 'p1';
+        } else {
+          // When a practice launches the ceremony through the award-v6 bridge,
+          // use its explicit final winner. Do not re-decide the winner here.
+          winner = explicitBridgeWinner(requestedWinner) || latestWinner(latest);
+        }
       } else if (kind === 'gold') {
         winner = 'p1';
       }
@@ -214,8 +225,8 @@
         awardQualified: pieceEarned,
         perfectSingle: !!old.perfectSingle || (mode === 1 && !!perfect),
         verified: true,
-        source: 'game-v5',
-        awardRules: 'v4-medal-only',
+        source: 'game-v6',
+        awardRules: 'v6-attempt-record',
         updatedAt: new Date().toISOString(),
         lastMode: mode,
         lastWinner: mode === 2 ? (isTie ? 'tie' : winnerNum) : (old.lastWinner ?? 0),
