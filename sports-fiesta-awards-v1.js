@@ -56,9 +56,9 @@
   const HUB_KEY = 'sportsFiestaHubProgress_v1';
   const HUB_URL = 'https://limkimsze-maker.github.io/P3-Length-Mass-and-Volume-Sports-Fiesta-/';
 
-  // Shared mastery rule for Practices 1–11: a wrong answer stays on the same question.
+  // Shared mastery/fair-play rule for Practices 1–11.
   const retryScript = document.createElement('script');
-  retryScript.src = HUB_URL + 'sports-fiesta-retry-v1.js?v=20260823b';
+  retryScript.src = HUB_URL + 'sports-fiesta-retry-v1.js?v=20260823c';
   retryScript.dataset.practice = String(PRACTICE_ID);
   retryScript.async = false;
   document.head.appendChild(retryScript);
@@ -137,6 +137,14 @@
         perfect: s.p1 != null && s.total != null && s.total > 0 && s.p1 === s.total
       };
     }
+
+    // Practice 1 is a true first-to-finish race. Practices 2–11 are equal-turn games;
+    // the fair-play helper supplies p1, p2 or tie according to the number of mistakes.
+    const fairWinner = window.__sportsFiestaFairWinner;
+    if (PRACTICE_ID !== 1 && (fairWinner === 'p1' || fairWinner === 'p2' || fairWinner === 'tie')) {
+      return {winner: fairWinner, perfect:false};
+    }
+
     if (s.c1 == null || s.c2 == null) return {winner:'tie', perfect:false};
     return {
       winner: s.c1 === s.c2 ? 'tie' : (s.c1 > s.c2 ? 'p1' : 'p2'),
@@ -178,7 +186,7 @@
       completed: true,
       verified: true,
       source: 'game-v5',
-      awardRules: 'v4-medal-only',
+      awardRules: 'v5-fair-two-player',
       pieceEarned,
       awardQualified: pieceEarned,
       perfectSingle: !!old.perfectSingle || (gm === 1 && outcome.perfect),
@@ -224,7 +232,7 @@
 
     const frame = document.createElement('iframe');
     frame.title = 'Sports Fiesta medal ceremony';
-    frame.src = HUB_URL + '?ceremonyBridge=award-v4&t=' + Date.now();
+    frame.src = HUB_URL + '?ceremonyBridge=award-v5&t=' + Date.now();
     Object.assign(frame.style, {
       position:'fixed', inset:'0', width:'100%', height:'100%',
       border:'0', zIndex:'2147483647', background:'#185b9d'
