@@ -1,0 +1,176 @@
+name: Install Mode-Specific Debug V3
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  install:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Replace cheat UI with password-gated mode controls
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path('sports-fiesta-awards-v1.js')
+          s = p.read_text(encoding='utf-8')
+          start = s.find('  /* SF_FLOW_CHEAT_')
+          end = s.find('  function addCeremonyNextButton(gm, outcome, progress) {', start)
+          if start < 0 or end < 0:
+              raise SystemExit('Could not locate existing cheat block')
+
+          block = r'''  /* SF_MODE_DEBUG_V3 — password 67; controls match the current game mode. */
+  const DEBUG_PASS = '67';
+  let debugUnlocked = sessionStorage.getItem('sportsFiestaDebugUnlocked_v3') === '1';
+
+  function cheatStats(kind, total) {
+    if (kind === 'single') return {correct:[total,0], wrong:[0,0]};
+    if (kind === 'p1') return {correct:[10,7], wrong:[0,3]};
+    if (kind === 'p2') return {correct:[7,10], wrong:[3,0]};
+    return {correct:[8,8], wrong:[2,2]};
+  }
+
+  function cheatFinish(kind) {
+    const gm = getMode();
+    if (gm === 1 && kind !== 'single') return;
+    if (gm === 2 && !['p1','p2','tie'].includes(kind)) return;
+    if (document.querySelector('iframe[title="Sports Fiesta medal ceremony"]')) return;
+
+    const total = Math.max(1, Number(questionTotal()) || 12);
+    const fake = cheatStats(kind, total);
+    const previousStats = window.__sportsFiestaAttemptStats;
+    window.__sportsFiestaAttemptStats = fake;
+
+    let outcome;
+    if (gm === 1) outcome = {winner:'p1', perfect:true, score:total, total};
+    else outcome = {winner:kind, perfect:false};
+
+    handledResult = true;
+    const progress = updateProgress(gm, outcome);
+
+    /* Debug should test the real ceremony, not a second fake result renderer. */
+    showCeremony(gm, outcome, progress);
+
+    setTimeout(() => {
+      if (window.__sportsFiestaAttemptStats !== fake) return;
+      if (previousStats == null) delete window.__sportsFiestaAttemptStats;
+      else window.__sportsFiestaAttemptStats = previousStats;
+    }, 0);
+  }
+  window.__sportsFiestaCheatFinish = cheatFinish;
+
+  function installPracticeDebug() {
+    if (document.getElementById('sfPracticeDebugV3')) return;
+
+    const style = document.createElement('style');
+    style.id = 'sfPracticeDebugStyleV3';
+    style.textContent = `
+      #sfPracticeDebugV3{position:fixed;right:12px;bottom:12px;z-index:2147483000;font-family:"Trebuchet MS",Arial,sans-serif;display:flex;align-items:flex-end;gap:8px;flex-wrap:wrap;justify-content:flex-end;max-width:min(640px,94vw)}
+      #sfDebugUnlockV3,#sfPracticeDebugV3 .sf-debug-btn{border:2px solid #fff;border-radius:13px;padding:9px 12px;font-size:12px;font-weight:1000;cursor:pointer;box-shadow:0 5px 16px rgba(0,0,0,.28)}
+      #sfDebugUnlockV3{background:#5c2aa6;color:#fff;border-radius:999px}
+      #sfDebugControlsV3{display:none;gap:7px;flex-wrap:wrap;justify-content:flex-end;background:rgba(255,255,255,.96);border:3px solid #d8c8ff;border-radius:16px;padding:8px;box-shadow:0 8px 24px rgba(0,0,0,.24)}
+      #sfPracticeDebugV3.unlocked #sfDebugControlsV3{display:flex}
+      #sfPracticeDebugV3.unlocked #sfDebugUnlockV3{display:none}
+      #sfPracticeDebugV3 .sf-single{background:#ffe272;color:#5d4300}
+      #sfPracticeDebugV3 .sf-p1{background:#dcecff;color:#144e88}
+      #sfPracticeDebugV3 .sf-p2{background:#ffe0e5;color:#8b2638}
+      #sfPracticeDebugV3 .sf-tie{background:#e6f7e8;color:#246b31}
+      #sfPracticeDebugV3 .sf-lock{background:#eef1f5;color:#53606d}
+      @media(max-width:600px){#sfPracticeDebugV3{right:7px;bottom:7px;gap:5px}#sfDebugUnlockV3,#sfPracticeDebugV3 .sf-debug-btn{padding:7px 9px;font-size:10px}#sfDebugControlsV3{padding:6px;gap:5px}}
+    `;
+    document.head.appendChild(style);
+
+    const panel = document.createElement('div');
+    panel.id = 'sfPracticeDebugV3';
+    panel.innerHTML = `
+      <button id="sfDebugUnlockV3" type="button">🔒 Debug</button>
+      <div id="sfDebugControlsV3"></div>`;
+    document.body.appendChild(panel);
+
+    const unlock = panel.querySelector('#sfDebugUnlockV3');
+    const controls = panel.querySelector('#sfDebugControlsV3');
+
+    const renderModeButtons = () => {
+      if (!debugUnlocked) {
+        panel.classList.remove('unlocked');
+        controls.innerHTML = '';
+        return;
+      }
+      panel.classList.add('unlocked');
+      const gm = getMode();
+      if (gm === 2) {
+        controls.innerHTML = `
+          <button class="sf-debug-btn sf-p1" type="button" data-sf-debug="p1">🔵 Player 1 Wins</button>
+          <button class="sf-debug-btn sf-p2" type="button" data-sf-debug="p2">🔴 Player 2 Wins</button>
+          <button class="sf-debug-btn sf-tie" type="button" data-sf-debug="tie">🤝 Tie</button>
+          <button class="sf-debug-btn sf-lock" type="button" data-sf-debug-lock>🔒</button>`;
+      } else {
+        controls.innerHTML = `
+          <button class="sf-debug-btn sf-single" type="button" data-sf-debug="single">⚡ Player 1 Cheat Solve</button>
+          <button class="sf-debug-btn sf-lock" type="button" data-sf-debug-lock>🔒</button>`;
+      }
+    };
+
+    unlock.onclick = () => {
+      const entered = window.prompt('Teacher debug password');
+      if (entered === null) return;
+      if (entered !== DEBUG_PASS) {
+        window.alert('Incorrect password.');
+        return;
+      }
+      debugUnlocked = true;
+      sessionStorage.setItem('sportsFiestaDebugUnlocked_v3','1');
+      renderModeButtons();
+    };
+
+    controls.addEventListener('click', e => {
+      const lock = e.target.closest?.('[data-sf-debug-lock]');
+      if (lock) {
+        debugUnlocked = false;
+        sessionStorage.removeItem('sportsFiestaDebugUnlocked_v3');
+        renderModeButtons();
+        return;
+      }
+      const btn = e.target.closest?.('[data-sf-debug]');
+      if (!btn) return;
+      cheatFinish(btn.dataset.sfDebug);
+    });
+
+    let lastMode = -1;
+    const syncMode = () => {
+      const gm = getMode();
+      if (gm !== lastMode) {
+        lastMode = gm;
+        renderModeButtons();
+      }
+    };
+    renderModeButtons();
+    setInterval(syncMode, 250);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', installPracticeDebug, {once:true});
+  } else {
+    installPracticeDebug();
+  }
+
+'''
+          p.write_text(s[:start] + block + s[end:], encoding='utf-8')
+          PY
+          node --check sports-fiesta-awards-v1.js
+
+      - name: Commit mode-specific debug controls
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add sports-fiesta-awards-v1.js
+          git commit -m "Put password debug controls inside each practice"
+          git push
