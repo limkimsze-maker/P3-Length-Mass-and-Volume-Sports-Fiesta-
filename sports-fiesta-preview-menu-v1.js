@@ -108,6 +108,54 @@
     }, 50);
   }
 
+  function previewMessageFor(scenario) {
+    if (scenario === 'p2-win') return 'Well done, Player 2.';
+    if (scenario === 'tie') return 'Well done, both players!';
+    if (scenario === 'gold') return '🏆 GOLD MEDAL CHAMPION — Well done, Player 1. 🏆';
+    return 'Well done, Player 1.';
+  }
+
+  function setPreviewMessage(scenario) {
+    const msg = document.getElementById('mcMessage');
+    if (!msg) return false;
+    const wanted = previewMessageFor(scenario);
+    if ((msg.textContent || '').trim() !== wanted) msg.textContent = wanted;
+    return true;
+  }
+
+  function installPreviewMessageGuard(scenario) {
+    const token = (window.__sfPreviewMessageGuardToken || 0) + 1;
+    window.__sfPreviewMessageGuardToken = token;
+    const enforce = () => {
+      if (window.__sfPreviewMessageGuardToken !== token) return;
+      setPreviewMessage(scenario);
+    };
+
+    [0,40,100,220,450,800,1300,2100,3200,5000,7000,10000,12000].forEach(ms => setTimeout(enforce, ms));
+
+    let observed = null;
+    let attempts = 0;
+    const findTimer = setInterval(() => {
+      if (window.__sfPreviewMessageGuardToken !== token) {
+        clearInterval(findTimer);
+        return;
+      }
+      const msg = document.getElementById('mcMessage');
+      if (msg && msg !== observed) {
+        observed = msg;
+        let busy = false;
+        new MutationObserver(() => {
+          if (busy || window.__sfPreviewMessageGuardToken !== token) return;
+          busy = true;
+          enforce();
+          busy = false;
+        }).observe(msg, {subtree:true, childList:true, characterData:true});
+        enforce();
+      }
+      if (++attempts > 260) clearInterval(findTimer);
+    }, 50);
+  }
+
   function setCopy(scenario) {
     const banner = document.querySelector('#medalCeremony .mc-banner');
     const sub = document.getElementById('mcSub');
@@ -146,6 +194,7 @@
     else if (scenario === 'gold') window.showMedalCeremony(true,'p1','gold');
     else return;
     [0,60,120,250,500,900,1500,2500].forEach(ms => setTimeout(() => setCopy(scenario), ms));
+    installPreviewMessageGuard(scenario);
   }
 
   function bind() {
