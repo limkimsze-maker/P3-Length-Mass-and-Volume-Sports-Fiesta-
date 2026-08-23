@@ -55,6 +55,16 @@
   const HUB_KEY = 'sportsFiestaHubProgress_v1';
   const HUB_URL = 'https://limkimsze-maker.github.io/P3-Length-Mass-and-Volume-Sports-Fiesta-/';
 
+  function readHubData() {
+    try { return JSON.parse(localStorage.getItem(HUB_KEY) || '{}') || {}; }
+    catch (_) { return {}; }
+  }
+
+  // Keep a protected copy of the 1-player record. Some individual games write
+  // generic fields such as lastMode/lastWinner before this shared script sees
+  // the result. A 2-player match must never erase the existing 1-player record.
+  let preservedSingleRecord = {...(readHubData()[PRACTICE_ID] || {})};
+
   // Shared mastery/fair-play rule for Practices 1–11.
   const retryScript = document.createElement('script');
   retryScript.src = HUB_URL + 'sports-fiesta-retry-v1.js?v=20260823f';
@@ -138,7 +148,7 @@
         p1 = Number(fraction[1]);
         if (total == null) {
           const t = Number(fraction[2]);
-          if (Number.isFinite(t)) return {p1, p2, c1, c2, total:t};
+          if (Number.isFinite(t)) return {p1, p2, c1, c2, total:t, text};
         }
       }
     }
@@ -150,7 +160,9 @@
     if (gm === 1) {
       return {
         winner: 'p1',
-        perfect: s.p1 != null && s.total != null && s.total > 0 && s.p1 === s.total
+        perfect: s.p1 != null && s.total != null && s.total > 0 && s.p1 === s.total,
+        score: s.p1,
+        total: s.total
       };
     }
 
@@ -182,62 +194,89 @@
     return {winner:s.c1===s.c2?'tie':(s.c1>s.c2?'p1':'p2'), perfect:false};
   }
 
-  function qualifiesOldRecord(x) {
-    if (!x) return false;
-    const oldWinner = x.lastWinner;
-    const awardWinner = x.lastAwardWinner;
-    const winnerQualified =
-      Number(x.lastMode) === 2 &&
-      (oldWinner === 'p1' || oldWinner === 'p2' || oldWinner === 'tie' ||
-       Number(oldWinner) === 1 || Number(oldWinner) === 2);
-    const awardWinnerQualified =
-      awardWinner === 'p1' || awardWinner === 'p2' || awardWinner === 'tie' ||
-      Number(awardWinner) === 1 || Number(awardWinner) === 2;
-    return x.perfectSingle === true || winnerQualified || awardWinnerQualified;
+  // Only perfect 1-player practices count toward the 11-piece gold medal.
+  // A 2-player match never contributes a medal piece to this count.
+  function qualifiesGoldRecord(x) {
+    return !!x && (x.perfectSingle === true || x.singlePlayerPerfect === true);
+  }
+
+  function goldPieceCount(data) {
+    let n = 0;
+    for (let i = 1; i <= 11; i++) if (qualifiesGoldRecord(data[i])) n++;
+    return n;
   }
 
   function updateProgress(gm, outcome) {
-    let data = {};
-    try { data = JSON.parse(localStorage.getItem(HUB_KEY) || '{}') || {}; } catch (_) {}
+    const data = readHubData();
     const old = data[PRACTICE_ID] || {};
-
-    let piecesBefore = 0;
-    for (let i = 1; i <= 11; i++) if (qualifiesOldRecord(data[i])) piecesBefore++;
-
-    const priorQualified = qualifiesOldRecord(old);
-    const qualifies = gm === 1 ? outcome.perfect : true;
-    const pieceEarned = priorQualified || qualifies;
-    const winnerValue = gm === 2
-      ? (outcome.winner === 'tie' ? 'tie' : (outcome.winner === 'p2' ? 2 : 1))
-      : (old.lastWinner ?? 0);
+    const piecesBefore = goldPieceCount(data);
     const stats = attemptStats();
 
-    data[PRACTICE_ID] = {
-      ...old,
-      completed: true,
-      verified: true,
-      source: 'game-v7',
-      awardRules: 'v7-winner-locked',
-      pieceEarned,
-      awardQualified: pieceEarned,
-      perfectSingle: !!old.perfectSingle || (gm === 1 && outcome.perfect),
-      updatedAt: new Date().toISOString(),
-      lastMode: gm,
-      lastWinner: winnerValue,
-      lastAwardWinner: qualifies
-        ? (gm === 1 ? 1 : (outcome.winner === 'tie' ? 'tie' : (outcome.winner === 'p2' ? 2 : 1)))
-        : (old.lastAwardWinner ?? 0),
-      lastAttemptStats: stats || old.lastAttemptStats || null
-    };
+    if (gm === 1) {
+      const wasPerfect = qualifiesGoldRecord(old) || qualifiesGoldRecord(preservedSingleRecord);
+      const nowPerfect = wasPerfect || !!outcome.perfect;
+      const oldBest = Number(old.singlePlayerBestScore);
+      const savedBest = Number(preservedSingleRecord.singlePlayerBestScore);
+      const current = Number(outcome.score);
+      const best = [oldBest, savedBest, current].filter(Number.isFinite).reduce((a,b)=>Math.max(a,b), -Infinity);
 
+      data[PRACTICE_ID] = {
+        ...old,
+        completed: true,
+        singlePlayerCompleted: true,
+        singlePlayerPerfect: nowPerfect,
+        singlePlayerBestScore: Number.isFinite(best) ? best : (old.singlePlayerBestScore ?? null),
+        singlePlayerTotal: Number.isFinite(Number(outcome.total)) ? Number(outcome.total) : (old.singlePlayerTotal ?? null),
+        perfectSingle: nowPerfect,
+        pieceEarned: nowPerfect,
+        awardQualified: nowPerfect,
+        verified: true,
+        source: 'game-v8',
+        awardRules: 'v8-single-vs-duel-separated',
+        updatedAt: new Date().toISOString(),
+        lastMode: 1,
+        lastWinner: old.lastWinner ?? 0,
+        lastAwardWinner: nowPerfect ? 1 : (old.lastAwardWinner ?? 0)
+      };
+      preservedSingleRecord = {...data[PRACTICE_ID]};
+    } else {
+      const protectedRecord = preservedSingleRecord || {};
+      const singlePerfect = qualifiesGoldRecord(protectedRecord);
+
+      // Preserve every 1-player progress field from before this 2-player match.
+      // Store the standalone match result under its own twoPlayer* fields only.
+      data[PRACTICE_ID] = {
+        ...old,
+        completed: protectedRecord.completed ?? old.completed ?? false,
+        singlePlayerCompleted: protectedRecord.singlePlayerCompleted ?? old.singlePlayerCompleted ?? false,
+        singlePlayerPerfect: protectedRecord.singlePlayerPerfect ?? protectedRecord.perfectSingle ?? false,
+        singlePlayerBestScore: protectedRecord.singlePlayerBestScore ?? old.singlePlayerBestScore ?? null,
+        singlePlayerTotal: protectedRecord.singlePlayerTotal ?? old.singlePlayerTotal ?? null,
+        perfectSingle: !!(protectedRecord.perfectSingle || protectedRecord.singlePlayerPerfect),
+        pieceEarned: singlePerfect,
+        awardQualified: singlePerfect,
+        verified: protectedRecord.verified ?? old.verified ?? false,
+        source: protectedRecord.source ?? old.source ?? 'game-v8',
+        awardRules: 'v8-single-vs-duel-separated',
+        updatedAt: protectedRecord.updatedAt ?? old.updatedAt ?? null,
+        lastMode: protectedRecord.lastMode ?? 0,
+        lastWinner: protectedRecord.lastWinner ?? 0,
+        lastAwardWinner: protectedRecord.lastAwardWinner ?? 0,
+        twoPlayerLastWinner: outcome.winner,
+        twoPlayerLastAttemptStats: stats,
+        twoPlayerUpdatedAt: new Date().toISOString()
+      };
+    }
+
+    const piecesAfter = goldPieceCount(data);
+    if (piecesAfter < 11) delete data.__finalGoldAwarded;
     localStorage.setItem(HUB_KEY, JSON.stringify(data));
 
-    let piecesAfter = 0;
-    for (let i = 1; i <= 11; i++) if (qualifiesOldRecord(data[i])) piecesAfter++;
-
     return {
-      qualifies,
-      newlyEarned: qualifies && !priorQualified,
+      // A completed 2-player match always qualifies for its standalone winner
+      // ceremony. In 1-player mode, the lesson medal requires a perfect score.
+      qualifies: gm === 2 ? true : !!outcome.perfect,
+      newlyEarned: gm === 1 && !!outcome.perfect && piecesAfter > piecesBefore,
       piecesBefore,
       piecesAfter
     };
@@ -266,14 +305,21 @@
   }
 
   function enforcePieceWinner(d, winner, gm, stats) {
+    const banner = d.querySelector('#medalCeremony .mc-banner');
     const sub = d.getElementById('mcSub');
     const msg = d.getElementById('mcMessage');
     const player = d.getElementById('mcPlayer');
     const player2 = d.getElementById('mcPlayer2');
     const sources = ceremonyPlayerSources(d);
 
+    if (banner) {
+      const wanted = gm === 2 ? '🏅 2-PLAYER MATCH AWARD 🏅' : '🏅 1/11 MEDAL AWARD 🏅';
+      if (banner.textContent !== wanted) banner.textContent = wanted;
+    }
     if (sub) {
-      const wanted = `Practice ${PRACTICE_ID} of 11 • ${SPORT}`;
+      const wanted = gm === 2
+        ? `Practice ${PRACTICE_ID} • ${SPORT} • Standalone 2-player match`
+        : `Practice ${PRACTICE_ID} of 11 • ${SPORT}`;
       if (sub.textContent !== wanted) sub.textContent = wanted;
     }
 
@@ -303,10 +349,10 @@
       if (gm === 1) {
         wanted = 'Perfect score! Player 1 earns a 1/11 medal!';
       } else if (winner === 'tie') {
-        wanted = 'It is a tie! Player 1 and Player 2 both receive a 1/11 medal!' + attemptLine;
+        wanted = 'It is a tie! Player 1 and Player 2 both receive the match award!' + attemptLine;
       } else {
         const why = stats && stats.c1===stats.c2 && stats.w1!==stats.w2 ? ' with fewer wrong attempts' : '';
-        wanted = `${winner === 'p2' ? 'Player 2' : 'Player 1'} wins${why} and earns a 1/11 medal!` + attemptLine;
+        wanted = `${winner === 'p2' ? 'Player 2' : 'Player 1'} wins this match${why} and receives the winner award!` + attemptLine;
       }
       if (msg.textContent !== wanted) msg.textContent = wanted;
     }
@@ -315,11 +361,13 @@
   function showCeremony(gm, outcome, progress) {
     const winner = gm === 1 ? 'p1' : outcome.winner;
     const stats = attemptStats();
-    const awardGoldNow = progress.qualifies && progress.piecesAfter === 11 && !goldAlreadyAwarded();
+    // Gold can only follow a 1-player perfect completion. 2-player matches are
+    // standalone and can never trigger the cumulative gold ceremony.
+    const awardGoldNow = gm === 1 && progress.qualifies && progress.piecesAfter === 11 && !goldAlreadyAwarded();
 
     const frame = document.createElement('iframe');
     frame.title = 'Sports Fiesta medal ceremony';
-    frame.src = HUB_URL + '?ceremonyBridge=award-v6&winner=' + encodeURIComponent(winner) + '&t=' + Date.now();
+    frame.src = HUB_URL + '?ceremonyBridge=award-v8&mode=' + gm + '&winner=' + encodeURIComponent(winner) + '&t=' + Date.now();
     Object.assign(frame.style, {
       position:'fixed', inset:'0', width:'100%', height:'100%',
       border:'0', zIndex:'2147483647', background:'#185b9d'
@@ -330,6 +378,7 @@
       try {
         const w = frame.contentWindow, d = w.document;
         w.__sportsFiestaBridgeWinner = winner;
+        w.__sportsFiestaBridgeMode = gm;
         d.body.classList.remove('cover-on');
         const cover = d.getElementById('fiestaCover');
         if (cover) cover.style.display = 'none';
@@ -376,7 +425,7 @@
           w.showMedalCeremony(false, 'p1', 'gold');
           const sub = d.getElementById('mcSub');
           const msg = d.getElementById('mcMessage');
-          if (sub) sub.textContent = 'All 11 Sports Fiesta lessons completed!';
+          if (sub) sub.textContent = 'All 11 Sports Fiesta 1-player lessons completed perfectly!';
           if (msg) msg.textContent = '🏆 Player 1 receives the Sports Fiesta GOLD MEDAL! 🏆';
         };
 
