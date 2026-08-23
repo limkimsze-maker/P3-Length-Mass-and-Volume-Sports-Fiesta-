@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Refresh tie script and cover award preview
+      - name: Load latest tie ceremony layout
         env:
           CACHE_KEY: ${{ github.sha }}
         run: |
@@ -22,35 +22,13 @@ jobs:
           p = Path('index.html')
           s = p.read_text(encoding='utf-8')
           version = os.environ.get('CACHE_KEY', 'latest')[:12]
-
-          # Always load the newest tie/result bridge.
           tag = f'<script src="tie-ceremony-two-players-v1.js?v={version}"></script>'
           pattern = r'<script\s+src=["\']tie-ceremony-two-players-v1\.js(?:\?[^"\']*)?["\']\s*></script>'
+
           if re.search(pattern, s):
               updated = re.sub(pattern, tag, s, count=1)
           else:
               updated = s.replace('</body>', tag + '\n</body>', 1)
-
-          # The cover preview must be correct in index.html itself. Do not depend
-          # on a later script rewriting this menu after the user opens it.
-          start_marker = '<div id="sfPreviewMenu"'
-          end_marker = '<!-- SF_REWARD_UPGRADE_HTML_END -->'
-          start = updated.find(start_marker)
-          end = updated.find(end_marker, start if start >= 0 else 0)
-          if start >= 0 and end > start:
-              menu = '''<div id="sfPreviewMenu" aria-hidden="true"><div class="sfBox">
-  <h3>🏅 Preview Every Award Animation</h3><p>Choose any real award scenario. Preview only — saved pupil progress will not change.</p>
-  <div class="sfBtns">
-    <button class="sfChoice" onclick="sfPreview('p1','piece')">👤 1 Player — Earn 1/11</button>
-    <button class="sfChoice" onclick="sfPreview('p1','piece')">🔵 2 Players — Player 1 Wins</button>
-    <button class="sfChoice" onclick="sfPreview('p2','piece')">🔴 2 Players — Player 2 Wins</button>
-    <button class="sfChoice" onclick="sfPreview('tie','piece')">🤝 2 Players — Tie / Shared 1st</button>
-    <button class="sfChoice" onclick="sfPreview('p1','gold')">🏆 11/11 — Final Gold Medal</button>
-    <button class="sfCancel" onclick="sfCloseMenu()">Close</button>
-  </div>
-</div></div>
-'''
-              updated = updated[:start] + menu + updated[end:]
 
           if updated != s:
               p.write_text(updated, encoding='utf-8')
@@ -61,5 +39,5 @@ jobs:
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add index.html
-          git commit -m "Refresh cover award preview and tie script"
+          git commit -m "Refresh two-player tie ceremony script"
           git push
