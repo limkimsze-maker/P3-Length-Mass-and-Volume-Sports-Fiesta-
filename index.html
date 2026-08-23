@@ -460,6 +460,7 @@ body.cover-on>.app{display:none!important}
 
 
 
+
 /* SF_REWARD_UPGRADE_START */
 #sfPass,#sfPreviewMenu{position:fixed;inset:0;z-index:230000;display:none;align-items:center;justify-content:center;padding:16px;background:#102b4dbf;backdrop-filter:blur(5px);font-family:"Trebuchet MS","Arial Rounded MT Bold",Arial,sans-serif}
 #sfPass.show,#sfPreviewMenu.show{display:flex}
@@ -476,6 +477,7 @@ body.cover-on>.app{display:none!important}
 .mc-card.piece .mc-face:before{content:"1/11";font-size:24px;font-weight:1000;text-shadow:0 1px #fff}.mc-card.piece .mc-face:after{content:"PIECE";position:absolute;bottom:18px;font-size:11px;font-weight:1000}
 .mc-card.gold .mc-face{background:radial-gradient(circle at 32% 28%,#fff9cc,#ffd84c 49%,#e29b13)}
 /* SF_REWARD_UPGRADE_END */
+
 
 
 
@@ -591,6 +593,7 @@ body.cover-on{min-height:100dvh}
 <!-- SPORTS_FIESTA_COVER_START --><section id="fiestaCover"><div class="fc-confetti"></div><div class="fc-wrap"><div class="fc-main"><div class="fc-player"><img id="fcP1" alt="Player 1"><span class="fc-tag fc-p1">PLAYER 1</span></div><div class="fc-center"><div class="fc-trophy">🏆</div><h1><span class="fc-top">LENGTH, MASS &amp; VOLUME</span>SPORTS FIESTA</h1><div class="fc-ribbon">11 SPORTS • 11 MEDAL PIECES • GO FOR GOLD!</div><div class="fc-board">Choose any sports game to practise. Complete all 11 with correct answers as a <b>single player</b> to win the <b>GOLD MEDAL!</b></div><button class="fc-start" id="fcStart">★ START SPORTS FIESTA ★</button><button class="fc-preview" type="button" onclick="unlockCeremonyPreview()">🔒 Preview Gold Medal Ceremony</button></div><div class="fc-player"><img id="fcP2" alt="Player 2"><span class="fc-tag fc-p2">PLAYER 2</span></div></div><div class="fc-track"><div class="fc-sport "><span class="n">1</span><span class="ic">🏃</span><b>Running</b></div><div class="fc-sport "><span class="n">2</span><span class="ic">🎯</span><b>Javelin Throw</b></div><div class="fc-sport "><span class="n">3</span><span class="ic">🎳</span><b>Bowling</b></div><div class="fc-sport "><span class="n">4</span><span class="ic">🏋️</span><b>Weightlifting</b></div><div class="fc-sport "><span class="n">5</span><span class="ic">⚫</span><b>Shot Put</b></div><div class="fc-sport "><span class="n">6</span><span class="ic">🏊</span><b>Swimming</b></div><div class="fc-sport "><span class="n">7</span><span class="ic">🤸💦</span><b>Diving</b></div><div class="fc-sport "><span class="n">8</span><span class="ic">🏐🌊</span><b>Water Polo</b></div><div class="fc-sport "><span class="n">9</span><span class="ic">⛵</span><b>Sailing</b></div><div class="fc-sport tri"><span class="n">10</span><span class="ic">🏊🚴🏃</span><b>Triathlon</b></div><div class="fc-sport "><span class="n">11</span><span class="ic">🔥</span><b>Torch Relay</b></div></div></div></section><!-- SPORTS_FIESTA_COVER_END -->
 
 
+
 <!-- SF_REWARD_UPGRADE_HTML_START -->
 <div id="sfPass" aria-hidden="true"><div class="sfBox">
   <h3>🔒 Teacher Preview</h3><p>Enter the password to preview the medal presentation.</p>
@@ -609,6 +612,7 @@ body.cover-on{min-height:100dvh}
   </div>
 </div></div>
 <!-- SF_REWARD_UPGRADE_HTML_END -->
+
 
 <section id="medalCeremony" aria-hidden="true"><div class="mc-card"><button class="mc-home" type="button" onclick="goSportsFiestaHome()">🏠 Back to Home</button><button class="mc-close" type="button" onclick="closeMedalCeremony()">×</button><div class="mc-previewTag">TEACHER PREVIEW</div><div class="mc-banner">🏆 GOLD MEDAL CEREMONY 🏆</div><div class="mc-sub" id="mcSub">All 11 Sports Fiesta challenges completed perfectly!</div><div class="mc-stage"><div class="mc-glow"></div><div class="mc-side left">2nd</div><div class="mc-side right">3rd</div><div class="mc-podium"></div><img class="mc-player" id="mcPlayer" alt="Player 1 receiving the gold medal"><div class="mc-medal"><div class="mc-face">★</div></div><div class="mc-message" id="mcMessage">Player 1, step onto the champion's rostrum!</div></div></div></section>
 
@@ -941,6 +945,8 @@ renderAll();
 <script>
 
 <script>
+
+<script>
 /* SF_REWARD_UPGRADE_JS_START */
 (function(){
 const PENDING="sportsFiestaPendingAward_v1",GOLDKEY="sportsFiestaGoldCeremonyShown_v1";
@@ -979,6 +985,8 @@ function setup(){wrap();pending();const i=document.getElementById("sfPassInput")
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",setup);else setup();
 })();
 /* SF_REWARD_UPGRADE_JS_END */
+</script>
+
 </script>
 
 </script>
