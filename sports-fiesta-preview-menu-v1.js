@@ -1,53 +1,15 @@
 (() => {
-  if (window.__sportsFiestaAllPreviewMenuV3) return;
-  window.__sportsFiestaAllPreviewMenuV3 = true;
+  if (window.__sportsFiestaPreviewDebugV4) return;
+  window.__sportsFiestaPreviewDebugV4 = true;
 
-  const STYLE_ID = 'sfAllPreviewStyleV3';
-  const PASS_ID = 'sfAllPreviewPassV1';
-  const MENU_ID = 'sfAllPreviewMenuV1';
+  const HUB_URL = 'https://limkimsze-maker.github.io/P3-Length-Mass-and-Volume-Sports-Fiesta-/';
+  const PASS = '67';
 
-  function addStyle() {
-    if (document.getElementById(STYLE_ID)) return;
-    const st = document.createElement('style');
-    st.id = STYLE_ID;
-    st.textContent = `
-      #${PASS_ID},#${MENU_ID}{position:fixed;inset:0;z-index:2147483647;display:none;align-items:center;justify-content:center;padding:18px;background:rgba(13,42,75,.78);backdrop-filter:blur(6px);font-family:"Trebuchet MS",Arial,sans-serif}
-      #${PASS_ID}.show,#${MENU_ID}.show{display:flex!important}
-      .sf-ap-box{width:min(560px,94vw);max-height:90vh;overflow:auto;background:#fff;border:5px solid #d8ecff;border-radius:26px;padding:24px;box-shadow:0 24px 70px rgba(0,0,0,.3);text-align:center}
-      .sf-ap-box h3{margin:0 0 7px;color:#154f82;font-size:clamp(24px,4vw,32px)}
-      .sf-ap-box p{margin:4px 0 16px;color:#55758e;font-weight:700;line-height:1.4}
-      #sfAllPreviewInputV1{width:160px;height:54px;border:3px solid #9fc9ec;border-radius:15px;text-align:center;font-size:28px;font-weight:1000;letter-spacing:5px;color:#111;background:#fff}
-      #sfAllPreviewErrorV1{min-height:24px;margin:7px 0;color:#c83c3c;font-weight:900}
-      .sf-ap-grid{display:grid;grid-template-columns:1fr;gap:10px;margin-top:12px}
-      .sf-ap-choice,.sf-ap-action{border:0;border-radius:15px;padding:13px 15px;font-weight:1000;font-size:17px;cursor:pointer;box-shadow:0 4px 0 rgba(0,0,0,.14)}
-      .sf-ap-choice{background:linear-gradient(#fff8c9,#ffd85d);color:#6b4900;border:2px solid #e3b73a}
-      .sf-ap-action{background:#357ed8;color:#fff}.sf-ap-cancel{background:#eaf1f6;color:#36566e}
-      .sf-ap-choice:active,.sf-ap-action:active{transform:translateY(2px);box-shadow:0 2px 0 rgba(0,0,0,.14)}
-      @media(min-width:650px){.sf-ap-grid{grid-template-columns:1fr 1fr}.sf-ap-grid .sf-ap-wide{grid-column:1/-1}}
-    `;
-    document.head.appendChild(st);
+  function getMode() {
+    try { if (typeof mode !== 'undefined') return Number(mode) === 2 ? 2 : 1; } catch (_) {}
+    try { if (typeof gameMode !== 'undefined') return String(gameMode).includes('2') ? 2 : 1; } catch (_) {}
+    return 1;
   }
-
-  function ensureUi() {
-    addStyle();
-    if (!document.getElementById(PASS_ID)) {
-      const pass = document.createElement('div');
-      pass.id = PASS_ID;
-      pass.setAttribute('aria-hidden','true');
-      pass.innerHTML = `<div class="sf-ap-box"><h3>🔒 Teacher Preview</h3><p>Enter the teacher password to preview all award animations.</p><input id="sfAllPreviewInputV1" type="password" inputmode="numeric" maxlength="2" autocomplete="off" aria-label="Teacher preview password"><div id="sfAllPreviewErrorV1"></div><div class="sf-ap-grid"><button class="sf-ap-action" type="button" id="sfAllPreviewUnlockV1">Unlock</button><button class="sf-ap-action sf-ap-cancel" type="button" id="sfAllPreviewCancelPassV1">Cancel</button></div></div>`;
-      document.body.appendChild(pass);
-    }
-    if (!document.getElementById(MENU_ID)) {
-      const menu = document.createElement('div');
-      menu.id = MENU_ID;
-      menu.setAttribute('aria-hidden','true');
-      menu.innerHTML = `<div class="sf-ap-box"><h3>🏅 Preview Every Award Animation</h3><p>Choose a real award scenario. Preview only — saved pupil progress will not change.</p><div class="sf-ap-grid"><button class="sf-ap-choice" data-sf-preview="single-piece">👤 1 Player — Earn 1/11</button><button class="sf-ap-choice" data-sf-preview="p1-win">🔵 2 Players — Player 1 Wins</button><button class="sf-ap-choice" data-sf-preview="p2-win">🔴 2 Players — Player 2 Wins</button><button class="sf-ap-choice" data-sf-preview="tie">🤝 2 Players — Tie / Shared 1st</button><button class="sf-ap-choice sf-ap-wide" data-sf-preview="gold">🏆 11/11 — Final Gold Medal</button><button class="sf-ap-action sf-ap-cancel sf-ap-wide" type="button" id="sfAllPreviewCloseV1">Close</button></div></div>`;
-      document.body.appendChild(menu);
-    }
-  }
-
-  function show(el) { el?.classList.add('show'); el?.setAttribute('aria-hidden','false'); }
-  function hide(el) { el?.classList.remove('show'); el?.setAttribute('aria-hidden','true'); }
 
   function wellDoneFor(winner) {
     if (winner === 'p2') return 'Well done, Player 2.';
@@ -55,274 +17,221 @@
     return 'Well done, Player 1.';
   }
 
-  function setWinnerMessage(winner, preserveScoreLines = false) {
-    const msg = document.getElementById('mcMessage');
-    if (!msg) return false;
+  function replaceWrongCongrats(root, winner) {
+    if (!root || winner === 'p1') return;
     const wanted = wellDoneFor(winner);
-    const currentText = (msg.textContent || '').trim();
-    if (currentText.startsWith(wanted)) return true;
-
-    let tail = '';
-    if (preserveScoreLines) {
-      const html = msg.innerHTML || '';
-      const br = html.indexOf('<br>');
-      if (br >= 0) tail = html.slice(br);
-    }
-    msg.innerHTML = `<b>${wanted}</b>${tail}`;
-    return true;
-  }
-
-  function replaceCongratulatoryText(root, winner) {
-    if (!root) return false;
-    const wanted = wellDoneFor(winner);
-    const p1Patterns = [
-      /Well\s*done\s*,?\s*Player\s*1\s*[.!]?/gi,
-      /Congratulations\s*,?\s*(?:to\s+)?Player\s*1\s*[.!]?/gi,
-      /Great\s*job\s*,?\s*Player\s*1\s*[.!]?/gi,
-      /Excellent\s*,?\s*Player\s*1\s*[.!]?/gi
-    ];
-    const p2Patterns = [
-      /Well\s*done\s*,?\s*Player\s*2\s*[.!]?/gi,
-      /Congratulations\s*,?\s*(?:to\s+)?Player\s*2\s*[.!]?/gi,
-      /Great\s*job\s*,?\s*Player\s*2\s*[.!]?/gi,
-      /Excellent\s*,?\s*Player\s*2\s*[.!]?/gi
-    ];
-    const patterns = winner === 'p2' ? p1Patterns : (winner === 'tie' ? [...p1Patterns, ...p2Patterns] : []);
-    if (!patterns.length) return false;
-
-    let changed = false;
+    const patterns = winner === 'p2'
+      ? [/Well\s*done\s*,?\s*Player\s*1\s*[.!]?/gi,/Congratulations\s*,?\s*(?:to\s+)?Player\s*1\s*[.!]?/gi,/Great\s*job\s*,?\s*Player\s*1\s*[.!]?/gi]
+      : [/Well\s*done\s*,?\s*Player\s*[12]\s*[.!]?/gi,/Congratulations\s*,?\s*(?:to\s+)?Player\s*[12]\s*[.!]?/gi,/Great\s*job\s*,?\s*Player\s*[12]\s*[.!]?/gi];
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
     const nodes = [];
     while (walker.nextNode()) nodes.push(walker.currentNode);
-    for (const node of nodes) {
+    nodes.forEach(node => {
       let text = node.nodeValue || '';
-      let next = text;
-      for (const re of patterns) next = next.replace(re, wanted);
-      if (next !== text) {
-        node.nodeValue = next;
-        changed = true;
-      }
-    }
-    return changed;
+      patterns.forEach(re => { text = text.replace(re, wanted); });
+      node.nodeValue = text;
+    });
   }
 
-  function enforceWinnerEverywhere(winner, preserveScoreLines = false) {
-    setWinnerMessage(winner, preserveScoreLines);
-    replaceCongratulatoryText(document.getElementById('medalCeremony'), winner);
-  }
-
-  function bridgeResult() {
+  function bridgeWinner() {
     try {
       const p = new URLSearchParams(location.search);
       if (!/^award-v(?:6|7|8)/.test(p.get('ceremonyBridge') || '')) return null;
-      if (Number(p.get('mode')) !== 2 && Number(window.__sportsFiestaBridgeMode) !== 2) return null;
       const w = window.__sportsFiestaBridgeWinner || p.get('winner');
       return w === 'p1' || w === 'p2' || w === 'tie' ? w : null;
     } catch (_) { return null; }
   }
 
-  function installRealResultCopyGuard() {
-    const winner = bridgeResult();
+  function guardRealCeremonyCopy() {
+    const winner = bridgeWinner();
     if (!winner) return;
-
-    const enforce = () => enforceWinnerEverywhere(winner, true);
-    [0,40,100,220,450,800,1300,2100,3200,5000,7000,10000,12000].forEach(ms => setTimeout(enforce, ms));
-
-    let observed = null;
-    let attempts = 0;
-    const findTimer = setInterval(() => {
-      const ceremony = document.getElementById('medalCeremony');
-      if (ceremony && ceremony !== observed) {
-        observed = ceremony;
-        let busy = false;
-        new MutationObserver(() => {
-          if (busy) return;
-          busy = true;
-          enforce();
-          busy = false;
-        }).observe(ceremony, {subtree:true, childList:true, characterData:true});
-        enforce();
-      }
-      if (++attempts > 260) clearInterval(findTimer);
-    }, 50);
-  }
-
-  function previewMessageFor(scenario) {
-    if (scenario === 'p2-win') return 'Well done, Player 2.';
-    if (scenario === 'tie') return 'Well done, both players!';
-    if (scenario === 'gold') return '🏆 GOLD MEDAL CHAMPION — Well done, Player 1. 🏆';
-    return 'Well done, Player 1.';
-  }
-
-  function scenarioWinner(scenario) {
-    if (scenario === 'p2-win') return 'p2';
-    if (scenario === 'tie') return 'tie';
-    return 'p1';
-  }
-
-  function setPreviewMessage(scenario) {
-    const msg = document.getElementById('mcMessage');
-    if (!msg) return false;
-    const wanted = previewMessageFor(scenario);
-    if ((msg.textContent || '').trim() !== wanted) msg.textContent = wanted;
-    replaceCongratulatoryText(document.getElementById('medalCeremony'), scenarioWinner(scenario));
-    return true;
-  }
-
-  function installPreviewMessageGuard(scenario) {
-    const token = (window.__sfPreviewMessageGuardToken || 0) + 1;
-    window.__sfPreviewMessageGuardToken = token;
     const enforce = () => {
-      if (window.__sfPreviewMessageGuardToken !== token) return;
-      setPreviewMessage(scenario);
-    };
-
-    [0,40,100,220,450,800,1300,2100,3200,5000,7000,10000,12000].forEach(ms => setTimeout(enforce, ms));
-
-    let observed = null;
-    let attempts = 0;
-    const findTimer = setInterval(() => {
-      if (window.__sfPreviewMessageGuardToken !== token) {
-        clearInterval(findTimer);
-        return;
-      }
       const ceremony = document.getElementById('medalCeremony');
-      if (ceremony && ceremony !== observed) {
-        observed = ceremony;
-        let busy = false;
-        new MutationObserver(() => {
-          if (busy || window.__sfPreviewMessageGuardToken !== token) return;
-          busy = true;
-          enforce();
-          busy = false;
-        }).observe(ceremony, {subtree:true, childList:true, characterData:true});
+      const msg = document.getElementById('mcMessage');
+      if (msg && winner !== 'p1') {
+        const lines = (msg.innerHTML || '').split(/<br\s*\/?\s*>/i);
+        const tail = lines.length > 1 ? '<br>' + lines.slice(1).join('<br>') : '';
+        msg.innerHTML = `<b>${wellDoneFor(winner)}</b>${tail}`;
+      }
+      replaceWrongCongrats(ceremony, winner);
+    };
+    [0,50,120,250,500,900,1500,2500,4500,7000].forEach(ms => setTimeout(enforce, ms));
+    let ceremony = null;
+    const timer = setInterval(() => {
+      const now = document.getElementById('medalCeremony');
+      if (now && now !== ceremony) {
+        ceremony = now;
+        new MutationObserver(enforce).observe(now, {subtree:true, childList:true, characterData:true});
         enforce();
       }
-      if (++attempts > 260) clearInterval(findTimer);
-    }, 50);
+    }, 100);
+    setTimeout(() => clearInterval(timer), 15000);
   }
 
-  function setCopy(scenario) {
-    const banner = document.querySelector('#medalCeremony .mc-banner');
-    const sub = document.getElementById('mcSub');
-    const msg = document.getElementById('mcMessage');
-    if (!banner || !sub || !msg) return;
-    if (scenario === 'single-piece') {
-      banner.textContent = '🏅 1-PLAYER 1/11 MEDAL AWARD 🏅';
-      sub.textContent = 'Teacher preview • perfect 1-player practice';
-      msg.textContent = 'Well done, Player 1.';
-    } else if (scenario === 'p1-win') {
-      banner.textContent = '🏅 2-PLAYER MATCH AWARD 🏅';
-      sub.textContent = 'Teacher preview • Player 1 wins';
-      msg.textContent = 'Well done, Player 1.';
-    } else if (scenario === 'p2-win') {
-      banner.textContent = '🏅 2-PLAYER MATCH AWARD 🏅';
-      sub.textContent = 'Teacher preview • Player 2 wins';
-      msg.textContent = 'Well done, Player 2.';
-    } else if (scenario === 'tie') {
-      banner.textContent = '🏅 2-PLAYER SHARED AWARD 🏅';
-      sub.textContent = 'Teacher preview • Tie / Shared 1st';
-      msg.textContent = 'Well done, both players!';
-    } else if (scenario === 'gold') {
-      banner.textContent = '🏆 GOLD MEDAL CEREMONY 🏆';
-      sub.textContent = 'Teacher preview • all 11 practices completed perfectly';
-      msg.textContent = '🏆 GOLD MEDAL CHAMPION — Well done, Player 1. 🏆';
+  const PREVIEW_PASS = 'sfPreviewPassV4';
+  const PREVIEW_MENU = 'sfPreviewMenuV4';
+  function ensurePreviewUi() {
+    if (!document.getElementById('sfPreviewDebugStyleV4')) {
+      const st = document.createElement('style');
+      st.id = 'sfPreviewDebugStyleV4';
+      st.textContent = `
+        #${PREVIEW_PASS},#${PREVIEW_MENU}{position:fixed;inset:0;z-index:2147483647;display:none;align-items:center;justify-content:center;padding:18px;background:rgba(13,42,75,.8);backdrop-filter:blur(6px);font-family:"Trebuchet MS",Arial,sans-serif}
+        #${PREVIEW_PASS}.show,#${PREVIEW_MENU}.show{display:flex!important}
+        .sf-v4-box{width:min(570px,94vw);max-height:90vh;overflow:auto;background:#fff;border:5px solid #d8ecff;border-radius:26px;padding:24px;text-align:center;box-shadow:0 24px 70px rgba(0,0,0,.3)}
+        .sf-v4-box h3{margin:0 0 8px;color:#154f82;font-size:clamp(24px,4vw,32px)}
+        .sf-v4-grid{display:grid;grid-template-columns:1fr;gap:10px;margin-top:14px}
+        .sf-v4-grid button{border:0;border-radius:15px;padding:13px 15px;font-weight:1000;font-size:16px;cursor:pointer;box-shadow:0 4px 0 rgba(0,0,0,.14)}
+        .sf-v4-choice{background:linear-gradient(#fff8c9,#ffd85d);color:#6b4900;border:2px solid #e3b73a!important}
+        .sf-v4-action{background:#357ed8;color:#fff}.sf-v4-cancel{background:#eaf1f6;color:#36566e}
+        #sfPreviewInputV4{width:160px;height:54px;border:3px solid #9fc9ec;border-radius:15px;text-align:center;font-size:28px;font-weight:1000;letter-spacing:5px}
+        #sfPreviewErrorV4{min-height:24px;margin:7px 0;color:#c83c3c;font-weight:900}
+        @media(min-width:650px){.sf-v4-grid{grid-template-columns:1fr 1fr}.sf-v4-wide{grid-column:1/-1}}
+      `;
+      document.head.appendChild(st);
     }
-    replaceCongratulatoryText(document.getElementById('medalCeremony'), scenarioWinner(scenario));
+    if (!document.getElementById(PREVIEW_PASS)) {
+      const el = document.createElement('div');
+      el.id = PREVIEW_PASS;
+      el.innerHTML = `<div class="sf-v4-box"><h3>🔒 Teacher Preview</h3><p>Enter password 67.</p><input id="sfPreviewInputV4" type="password" inputmode="numeric" maxlength="2"><div id="sfPreviewErrorV4"></div><div class="sf-v4-grid"><button class="sf-v4-action" id="sfPreviewUnlockV4">Unlock</button><button class="sf-v4-action sf-v4-cancel" id="sfPreviewCancelV4">Cancel</button></div></div>`;
+      document.body.appendChild(el);
+    }
+    if (!document.getElementById(PREVIEW_MENU)) {
+      const el = document.createElement('div');
+      el.id = PREVIEW_MENU;
+      el.innerHTML = `<div class="sf-v4-box"><h3>🏅 Preview Every Award Animation</h3><p>Preview only — saved pupil progress will not change.</p><div class="sf-v4-grid"><button class="sf-v4-choice" data-preview-v4="single">👤 1 Player — Earn 1/11</button><button class="sf-v4-choice" data-preview-v4="p1">🔵 2 Players — Player 1 Wins</button><button class="sf-v4-choice" data-preview-v4="p2">🔴 2 Players — Player 2 Wins</button><button class="sf-v4-choice" data-preview-v4="tie">🤝 2 Players — Tie / Shared 1st</button><button class="sf-v4-choice sf-v4-wide" data-preview-v4="gold">🏆 11/11 — Final Gold Medal</button><button class="sf-v4-action sf-v4-cancel sf-v4-wide" id="sfPreviewCloseV4">Close</button></div></div>`;
+      document.body.appendChild(el);
+    }
   }
 
-  function playScenario(scenario) {
-    hide(document.getElementById(MENU_ID));
+  function previewScenario(kind) {
+    const menu = document.getElementById(PREVIEW_MENU);
+    menu?.classList.remove('show');
     if (typeof window.showMedalCeremony !== 'function') return;
-    if (scenario === 'single-piece') window.showMedalCeremony(true,'p1','piece');
-    else if (scenario === 'p1-win') window.showMedalCeremony(true,'p1','piece');
-    else if (scenario === 'p2-win') window.showMedalCeremony(true,'p2','piece');
-    else if (scenario === 'tie') window.showMedalCeremony(true,'tie','piece');
-    else if (scenario === 'gold') window.showMedalCeremony(true,'p1','gold');
-    else return;
-    [0,60,120,250,500,900,1500,2500].forEach(ms => setTimeout(() => setCopy(scenario), ms));
-    installPreviewMessageGuard(scenario);
+    if (kind === 'p2') window.showMedalCeremony(true,'p2','piece');
+    else if (kind === 'tie') window.showMedalCeremony(true,'tie','piece');
+    else if (kind === 'gold') window.showMedalCeremony(true,'p1','gold');
+    else window.showMedalCeremony(true,'p1','piece');
+    const winner = kind === 'p2' ? 'p2' : kind === 'tie' ? 'tie' : 'p1';
+    const msg = document.getElementById('mcMessage');
+    if (msg) msg.textContent = kind === 'gold' ? '🏆 GOLD MEDAL CHAMPION — Well done, Player 1. 🏆' : wellDoneFor(winner);
+    replaceWrongCongrats(document.getElementById('medalCeremony'), winner);
   }
 
-  function cheatResultCopy(kind) {
-    if (kind === 'p1') return {title:'Player 1 Wins!', well:'Well done, Player 1.', scores:'Player 1 — Correct: 10 | Wrong: 0<br>Player 2 — Correct: 7 | Wrong: 3'};
-    if (kind === 'p2') return {title:'Player 2 Wins!', well:'Well done, Player 2.', scores:'Player 1 — Correct: 7 | Wrong: 3<br>Player 2 — Correct: 10 | Wrong: 0'};
-    if (kind === 'tie') return {title:"It’s a Tie!", well:'Well done, both players!', scores:'Player 1 — Correct: 8 | Wrong: 2<br>Player 2 — Correct: 8 | Wrong: 2'};
-    return {title:'Practice Complete!', well:'Well done, Player 1.', scores:'Player 1 — Perfect score'};
-  }
-
-  function showCheatFlowResult(kind) {
-    document.getElementById('sfCheatFlowOverlayV1')?.remove();
-    const copy = cheatResultCopy(kind);
-    const overlay = document.createElement('div');
-    overlay.id = 'sfCheatFlowOverlayV1';
-    Object.assign(overlay.style, {position:'fixed',inset:'0',zIndex:'2147483646',display:'flex',alignItems:'center',justifyContent:'center',padding:'18px',background:'rgba(12,42,75,.84)',backdropFilter:'blur(5px)',fontFamily:'Trebuchet MS,Arial,sans-serif'});
-    overlay.innerHTML = `<div style="width:min(520px,94vw);background:#fff;color:#17324d;border:5px solid #d9ecff;border-radius:26px;padding:24px;text-align:center;box-shadow:0 24px 70px rgba(0,0,0,.32)"><div style="font-size:13px;font-weight:900;color:#6d35c7;margin-bottom:8px">🧪 FLOW TEST</div><div style="font-size:clamp(28px,6vw,42px);font-weight:1000;margin:4px 0 8px">${copy.title}</div><div style="font-size:20px;font-weight:1000;color:#267044;margin-bottom:14px">${copy.well}</div><div style="font-size:17px;font-weight:800;line-height:1.65;background:#f4f8fc;border-radius:16px;padding:13px 15px;margin:0 auto 18px">${copy.scores}</div><button id="sfCheatFlowNextV1" type="button" style="min-width:170px;border:0;border-radius:15px;padding:13px 22px;background:#f4c542;color:#4b3700;font-size:20px;font-weight:1000;cursor:pointer;box-shadow:0 5px 0 #c99d22">Next →</button></div>`;
-    document.body.appendChild(overlay);
-    overlay.querySelector('#sfCheatFlowNextV1').onclick = () => {
-      overlay.remove();
-      const fn = window.__sportsFiestaCheatFinish;
-      if (typeof fn === 'function') fn(kind);
+  function bindPreview() {
+    ensurePreviewUi();
+    const pass = document.getElementById(PREVIEW_PASS);
+    const menu = document.getElementById(PREVIEW_MENU);
+    const input = document.getElementById('sfPreviewInputV4');
+    const err = document.getElementById('sfPreviewErrorV4');
+    window.unlockCeremonyPreview = () => {
+      input.value = ''; err.textContent = ''; pass.classList.add('show');
+      setTimeout(() => input.focus(), 50);
     };
+    const unlock = () => {
+      if (input.value !== PASS) { err.textContent = 'Incorrect password.'; input.value=''; input.focus(); return; }
+      pass.classList.remove('show'); menu.classList.add('show');
+    };
+    document.getElementById('sfPreviewUnlockV4').onclick = unlock;
+    document.getElementById('sfPreviewCancelV4').onclick = () => pass.classList.remove('show');
+    document.getElementById('sfPreviewCloseV4').onclick = () => menu.classList.remove('show');
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') unlock(); });
+    menu.querySelectorAll('[data-preview-v4]').forEach(btn => btn.onclick = () => previewScenario(btn.dataset.previewV4));
   }
 
-  function installCheatFlowInterceptor() {
-    if (window.__sfCheatFlowInterceptorV1) return;
-    window.__sfCheatFlowInterceptorV1 = true;
-    document.addEventListener('click', e => {
-      const btn = e.target.closest?.('#sfFlowCheatPanel [data-sf-cheat]');
-      if (!btn) return;
-      e.preventDefault();
-      e.stopPropagation();
-      e.stopImmediatePropagation();
-      const kind = btn.dataset.sfCheat;
-      if (!['single','p1','p2','tie'].includes(kind)) return;
-      const panel = document.getElementById('sfFlowCheatPanel');
-      panel?.classList.remove('open');
-      panel?.querySelector('#sfFlowCheatToggle')?.setAttribute('aria-expanded','false');
-      showCheatFlowResult(kind);
-    }, true);
+  let debugUnlocked = sessionStorage.getItem('sportsFiestaDebugUnlocked_v4') === '1';
+  let debugBusy = false;
+
+  function forceDebugCeremonyVisible() {
+    if (!debugBusy) return;
+    const frames = [...document.querySelectorAll('iframe[title="Sports Fiesta medal ceremony"]')];
+    const frame = frames[frames.length - 1];
+    if (!frame) return;
+    frame.title = 'Sports Fiesta DEBUG ceremony';
+    frame.style.setProperty('display','block','important');
+    frame.style.setProperty('visibility','visible','important');
+    frame.style.setProperty('opacity','1','important');
+  }
+
+  function runExistingCheat(kind) {
+    if (typeof window.__sportsFiestaCheatFinish !== 'function') return;
+    debugBusy = true;
+    window.__sportsFiestaCheatFinish(kind);
+    [0,30,80,150].forEach(ms => setTimeout(() => document.getElementById('sfCheatFlowNextV2')?.click(), ms));
+    [30,80,150,300,600,1000,1800].forEach(ms => setTimeout(forceDebugCeremonyVisible, ms));
+    setTimeout(() => { debugBusy = false; }, 5000);
+  }
+
+  function installDebug() {
+    document.getElementById('sfFlowCheatPanel')?.remove();
+    if (!document.getElementById('sfPracticeDebugStyleV4')) {
+      const st = document.createElement('style');
+      st.id = 'sfPracticeDebugStyleV4';
+      st.textContent = `
+        #sfPracticeDebugV4{position:fixed;right:12px;bottom:12px;z-index:2147483002;font-family:"Trebuchet MS",Arial,sans-serif;display:flex;align-items:flex-end;gap:7px;flex-wrap:wrap;justify-content:flex-end;max-width:min(680px,95vw)}
+        #sfPracticeDebugV4 button{border:2px solid #fff;border-radius:13px;padding:9px 12px;font-size:12px;font-weight:1000;cursor:pointer;box-shadow:0 5px 16px rgba(0,0,0,.25)}
+        #sfDebugUnlockV4{background:#5c2aa6;color:#fff;border-radius:999px!important}
+        #sfDebugButtonsV4{display:none;gap:7px;flex-wrap:wrap;justify-content:flex-end;background:rgba(255,255,255,.97);border:3px solid #d8c8ff;border-radius:16px;padding:8px}
+        #sfPracticeDebugV4.unlocked #sfDebugButtonsV4{display:flex}#sfPracticeDebugV4.unlocked #sfDebugUnlockV4{display:none}
+        .sf-debug-single{background:#ffe272;color:#5d4300}.sf-debug-p1{background:#dcecff;color:#144e88}.sf-debug-p2{background:#ffe0e5;color:#8b2638}.sf-debug-tie{background:#e6f7e8;color:#246b31}.sf-debug-lock{background:#eef1f5;color:#53606d}
+        @media(max-width:600px){#sfPracticeDebugV4{right:7px;bottom:7px}#sfPracticeDebugV4 button{padding:7px 9px;font-size:10px}#sfDebugButtonsV4{gap:5px;padding:6px}}
+      `;
+      document.head.appendChild(st);
+    }
+    let panel = document.getElementById('sfPracticeDebugV4');
+    if (!panel) {
+      panel = document.createElement('div');
+      panel.id = 'sfPracticeDebugV4';
+      panel.innerHTML = `<button id="sfDebugUnlockV4" type="button">DEBUG</button><div id="sfDebugButtonsV4"></div>`;
+      document.body.appendChild(panel);
+      panel.querySelector('#sfDebugUnlockV4').onclick = () => {
+        const entered = window.prompt('DEBUG password');
+        if (entered === null) return;
+        if (entered !== PASS) { window.alert('Incorrect password.'); return; }
+        debugUnlocked = true;
+        sessionStorage.setItem('sportsFiestaDebugUnlocked_v4','1');
+        renderDebugButtons();
+      };
+      panel.querySelector('#sfDebugButtonsV4').addEventListener('click', e => {
+        const lock = e.target.closest?.('[data-debug-lock-v4]');
+        if (lock) {
+          debugUnlocked = false;
+          sessionStorage.removeItem('sportsFiestaDebugUnlocked_v4');
+          renderDebugButtons();
+          return;
+        }
+        const btn = e.target.closest?.('[data-debug-kind-v4]');
+        if (btn) runExistingCheat(btn.dataset.debugKindV4);
+      });
+    }
+    renderDebugButtons();
+  }
+
+  function renderDebugButtons() {
+    const panel = document.getElementById('sfPracticeDebugV4');
+    const box = document.getElementById('sfDebugButtonsV4');
+    if (!panel || !box) return;
+    if (!debugUnlocked) { panel.classList.remove('unlocked'); box.innerHTML=''; return; }
+    panel.classList.add('unlocked');
+    if (getMode() === 2) {
+      box.innerHTML = `<button class="sf-debug-p1" data-debug-kind-v4="p1">Player 1 Wins</button><button class="sf-debug-p2" data-debug-kind-v4="p2">Player 2 Wins</button><button class="sf-debug-tie" data-debug-kind-v4="tie">Tie</button><button class="sf-debug-lock" data-debug-lock-v4>🔒</button>`;
+    } else {
+      box.innerHTML = `<button class="sf-debug-single" data-debug-kind-v4="single">Player 1 Cheat Solve</button><button class="sf-debug-lock" data-debug-lock-v4>🔒</button>`;
+    }
   }
 
   function bind() {
-    ensureUi();
-    const pass = document.getElementById(PASS_ID);
-    const menu = document.getElementById(MENU_ID);
-    const input = document.getElementById('sfAllPreviewInputV1');
-    const err = document.getElementById('sfAllPreviewErrorV1');
-    const unlock = document.getElementById('sfAllPreviewUnlockV1');
-    const cancelPass = document.getElementById('sfAllPreviewCancelPassV1');
-    const closeMenu = document.getElementById('sfAllPreviewCloseV1');
-
-    window.unlockCeremonyPreview = function() {
-      ensureUi();
-      if (err) err.textContent = '';
-      if (input) input.value = '';
-      show(pass);
-      setTimeout(() => input?.focus(), 60);
+    bindPreview();
+    guardRealCeremonyCopy();
+    let lastMode = -1;
+    const sync = () => {
+      document.getElementById('sfFlowCheatPanel')?.remove();
+      installDebug();
+      const gm = getMode();
+      if (gm !== lastMode) { lastMode = gm; renderDebugButtons(); }
+      if (debugBusy) forceDebugCeremonyVisible();
     };
-
-    const check = () => {
-      if (input?.value === '67') {
-        hide(pass);
-        if (err) err.textContent = '';
-        show(menu);
-      } else {
-        if (err) err.textContent = 'Incorrect password.';
-        if (input) { input.value = ''; input.focus(); }
-      }
-    };
-
-    unlock.onclick = check;
-    cancelPass.onclick = () => hide(pass);
-    closeMenu.onclick = () => hide(menu);
-    input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); check(); } });
-    menu.querySelectorAll('[data-sf-preview]').forEach(btn => {
-      btn.addEventListener('click', () => playScenario(btn.dataset.sfPreview));
-    });
-
-    installRealResultCopyGuard();
-    installCheatFlowInterceptor();
+    sync();
+    setInterval(sync, 250);
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bind, {once:true});
