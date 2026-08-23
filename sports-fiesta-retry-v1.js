@@ -10,6 +10,8 @@
   const correctAttempts = window.__sportsFiestaCorrectAttempts = [0,0];
   window.__sportsFiestaAttemptStats = {correct:correctAttempts, wrong:mistakes};
   let fairResultApplied = false;
+  let ceremonyAllowed = false;
+  let pendingCeremonyFrame = null;
 
   function feedbackEl(){
     return document.getElementById('feedback') || document.getElementById('fb');
@@ -29,7 +31,11 @@
     mistakes[0]=0; mistakes[1]=0;
     correctAttempts[0]=0; correctAttempts[1]=0;
     fairResultApplied=false;
+    ceremonyAllowed=false;
     window.__sportsFiestaFairWinner=null;
+    document.getElementById('sfCeremonyNextWrap')?.remove();
+    if(pendingCeremonyFrame && pendingCeremonyFrame.isConnected) pendingCeremonyFrame.remove();
+    pendingCeremonyFrame=null;
   }
   function recordMistake(pi=activePlayerIndex()){
     if(getMode()!==2) return;
@@ -124,6 +130,79 @@
     return original.apply(this,arguments);
   });
 
+  // Hold any automatically-opened ceremony out of view until pupils press Next.
+  function holdCeremonyFrame(frame){
+    if(!frame || ceremonyAllowed) return;
+    pendingCeremonyFrame=frame;
+    frame.style.setProperty('display','none','important');
+  }
+  function scanForCeremony(node){
+    if(!node || node.nodeType!==1) return;
+    if(node.matches?.('iframe[title="Sports Fiesta medal ceremony"]')) holdCeremonyFrame(node);
+    node.querySelectorAll?.('iframe[title="Sports Fiesta medal ceremony"]').forEach(holdCeremonyFrame);
+  }
+  new MutationObserver(records=>{
+    records.forEach(r=>r.addedNodes.forEach(scanForCeremony));
+  }).observe(document.documentElement,{subtree:true,childList:true});
+
+  function revealCeremony(){
+    ceremonyAllowed=true;
+    const btn=document.getElementById('sfCeremonyNext');
+    if(btn) btn.disabled=true;
+    if(pendingCeremonyFrame && pendingCeremonyFrame.isConnected){
+      pendingCeremonyFrame.style.setProperty('display','block','important');
+      pendingCeremonyFrame=null;
+    }
+  }
+
+  function ensureCeremonyNextButton(){
+    if(getMode()!==2) return;
+    const results=document.getElementById('results');
+    if(!results || !results.classList.contains('active')) return;
+
+    let wrap=document.getElementById('sfCeremonyNextWrap');
+    let btn=document.getElementById('sfCeremonyNext');
+    if(!wrap){
+      wrap=document.createElement('div');
+      wrap.id='sfCeremonyNextWrap';
+      wrap.style.cssText='display:flex !important;justify-content:center !important;align-items:center !important;width:100% !important;margin:18px auto 6px !important;position:relative !important;z-index:2147483000 !important;visibility:visible !important;opacity:1 !important;';
+      results.appendChild(wrap);
+    }
+    if(!btn){
+      btn=document.createElement('button');
+      btn.id='sfCeremonyNext';
+      btn.type='button';
+      btn.textContent='Next →';
+      btn.setAttribute('aria-label','Next to medal ceremony');
+      btn.style.cssText='appearance:none !important;display:inline-flex !important;align-items:center !important;justify-content:center !important;min-width:170px !important;min-height:54px !important;padding:12px 28px !important;border:3px solid #9b6a00 !important;border-radius:16px !important;background:#ffd34d !important;color:#172033 !important;font:900 21px/1.1 system-ui,-apple-system,Segoe UI,sans-serif !important;box-shadow:0 5px 0 #9b6a00,0 8px 18px rgba(0,0,0,.18) !important;cursor:pointer !important;visibility:visible !important;opacity:1 !important;position:relative !important;z-index:2147483001 !important;transform:none !important;';
+      wrap.appendChild(btn);
+    }else if(btn.parentElement!==wrap){
+      wrap.appendChild(btn);
+    }
+    if(!btn.dataset.sfPauseHook){
+      btn.dataset.sfPauseHook='1';
+      // Capture phase runs before the awards script's own onclick handler.
+      btn.addEventListener('click',revealCeremony,true);
+    }
+    btn.style.setProperty('display','inline-flex','important');
+    btn.style.setProperty('visibility','visible','important');
+    btn.style.setProperty('opacity','1','important');
+    btn.disabled=false;
+  }
+
+  function enforceResultPause(){
+    const results=document.getElementById('results');
+    if(results?.classList.contains('active') && getMode()===2){
+      ensureCeremonyNextButton();
+    }else if(!results?.classList.contains('active')){
+      ceremonyAllowed=false;
+      document.getElementById('sfCeremonyNextWrap')?.remove();
+    }
+  }
+  new MutationObserver(enforceResultPause).observe(document.documentElement,{
+    subtree:true,childList:true,attributes:true,attributeFilter:['class','style']
+  });
+
   // All 2-player result screens show the same transparent attempt breakdown.
   // Practice 1 keeps its true race winner. Practices 2–11 use:
   // more correct attempts -> fewer wrong attempts -> tie.
@@ -146,6 +225,7 @@
           `Player 1 — Correct: <b>${c1}</b> &nbsp; Wrong: <b>${m1}</b><br>`+
           `Player 2 — Correct: <b>${c2}</b> &nbsp; Wrong: <b>${m2}</b>`;
       }
+      ensureCeremonyNextButton();
       return;
     }
 
@@ -164,6 +244,7 @@
         `Player 1 — Correct: <b>${c1}</b> &nbsp; Wrong: <b>${m1}</b><br>`+
         `Player 2 — Correct: <b>${c2}</b> &nbsp; Wrong: <b>${m2}</b><br><br>${reason}`;
     }
+    ensureCeremonyNextButton();
   }
 
   new MutationObserver(applyFairTurnTakingResult).observe(document.documentElement,{
