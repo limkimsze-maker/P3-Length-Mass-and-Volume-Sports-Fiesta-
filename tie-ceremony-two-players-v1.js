@@ -1,9 +1,9 @@
 (() => {
-  if (window.__sfTieAndPreviewV9) return;
-  window.__sfTieAndPreviewV9 = true;
+  if (window.__sfTieAndPreviewV10) return;
+  window.__sfTieAndPreviewV10 = true;
 
   const style = document.createElement('style');
-  style.id = 'sf-tie-preview-v9-style';
+  style.id = 'sf-tie-preview-v10-style';
   style.textContent = `
     #medalCeremony .sf-tie-fallback{
       position:absolute!important;bottom:150px!important;z-index:10!important;
@@ -113,7 +113,7 @@
   function installTieBridge() {
     const base = window.showMedalCeremony;
     if (typeof base !== 'function') return false;
-    if (base.__sfTiePreviewV9) return true;
+    if (base.__sfTiePreviewV10) return true;
 
     const wrapped = function(preview = false, winner = 'p1', kind = 'gold') {
       if (winner === 'tie' && kind === 'piece') {
@@ -124,7 +124,7 @@
       clearTie();
       return base.apply(this, arguments);
     };
-    wrapped.__sfTiePreviewV9 = true;
+    wrapped.__sfTiePreviewV10 = true;
     window.showMedalCeremony = wrapped;
     return true;
   }
@@ -172,12 +172,23 @@
     [0, 80, 300].forEach(ms => setTimeout(() => setPreviewCopy(scenario), ms));
   };
 
+  const expectedButtons = [
+    '👤 1 Player — Earn 1/11',
+    '🔵 2 Players — Player 1 Wins',
+    '🔴 2 Players — Player 2 Wins',
+    '🤝 2 Players — Tie / Shared 1st',
+    '🏆 11/11 — Final Gold Medal'
+  ];
+
   function installPreviewMenu() {
     const menu = document.getElementById('sfPreviewMenu');
     const box = menu?.querySelector('.sfBox');
     const buttons = box?.querySelector('.sfBtns');
     if (!buttons) return false;
-    if (buttons.dataset.allAwardAnimations === 'v9') return true;
+
+    const current = [...buttons.querySelectorAll('.sfChoice')].map(b => (b.textContent || '').trim());
+    const correct = current.length === expectedButtons.length && expectedButtons.every((x, i) => current[i] === x);
+    if (correct && buttons.dataset.allAwardAnimations === 'v10') return true;
 
     const heading = box.querySelector('h3');
     const note = box.querySelector('p');
@@ -192,16 +203,51 @@
       <button class="sfChoice" type="button" onclick="sfPreviewScenario('gold')">🏆 11/11 — Final Gold Medal</button>
       <button class="sfCancel" type="button" onclick="sfCloseMenu()">Close</button>
     `;
-    buttons.dataset.allAwardAnimations = 'v9';
+    buttons.dataset.allAwardAnimations = 'v10';
     return true;
   }
 
-  installTieBridge();
-  installPreviewMenu();
-  let tries = 0;
-  const timer = setInterval(() => {
-    const a = installTieBridge();
-    const b = installPreviewMenu();
-    if ((a && b) || ++tries > 100) clearInterval(timer);
-  }, 50);
+  function installUnlockGuard() {
+    const baseCheck = window.sfCheckPass;
+    if (typeof baseCheck === 'function' && !baseCheck.__sfPreviewMenuV10) {
+      const wrappedCheck = function() {
+        const out = baseCheck.apply(this, arguments);
+        [0, 20, 80, 180].forEach(ms => setTimeout(installPreviewMenu, ms));
+        return out;
+      };
+      wrappedCheck.__sfPreviewMenuV10 = true;
+      window.sfCheckPass = wrappedCheck;
+    }
+
+    const baseUnlock = window.unlockCeremonyPreview;
+    if (typeof baseUnlock === 'function' && !baseUnlock.__sfPreviewMenuV10) {
+      const wrappedUnlock = function() {
+        installPreviewMenu();
+        const out = baseUnlock.apply(this, arguments);
+        setTimeout(installPreviewMenu, 20);
+        return out;
+      };
+      wrappedUnlock.__sfPreviewMenuV10 = true;
+      window.unlockCeremonyPreview = wrappedUnlock;
+    }
+  }
+
+  function observeMenu() {
+    const menu = document.getElementById('sfPreviewMenu');
+    if (!menu || menu.__sfPreviewObserverV10) return false;
+    menu.__sfPreviewObserverV10 = true;
+    const observer = new MutationObserver(() => queueMicrotask(installPreviewMenu));
+    observer.observe(menu, {subtree:true, childList:true, characterData:true});
+    return true;
+  }
+
+  function installEverything() {
+    installTieBridge();
+    installPreviewMenu();
+    installUnlockGuard();
+    observeMenu();
+  }
+
+  installEverything();
+  [50, 150, 350, 800, 1600, 3000].forEach(ms => setTimeout(installEverything, ms));
 })();
