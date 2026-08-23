@@ -1,14 +1,13 @@
 (() => {
-  if (window.__sfTieDirectV6) return;
-  window.__sfTieDirectV6 = true;
+  if (window.__sfTieDirectV7) return;
+  window.__sfTieDirectV7 = true;
 
   const style = document.createElement('style');
-  style.id = 'sf-tie-two-players-v6';
+  style.id = 'sf-tie-two-players-v7';
   style.textContent = `
     #medalCeremony .mc-card.tie{overflow:hidden!important}
     #medalCeremony .mc-card.tie .mc-side{opacity:.12!important}
     #medalCeremony .mc-card.tie .mc-previewTag{display:none!important}
-    #medalCeremony .mc-card.tie .mc-face{display:none!important}
     #medalCeremony .mc-card.tie .mc-podium::before{content:"1st"!important;font-size:clamp(48px,7vw,72px)!important;line-height:1.6!important}
 
     #medalCeremony .mc-card.tie .mc-banner{font-size:clamp(16px,2.2vw,22px)!important;letter-spacing:.08em!important}
@@ -184,12 +183,20 @@
   function install(){
     const base=window.showMedalCeremony;
     if(typeof base!=='function')return false;
-    if(base.__sfTieDirectV6)return true;
+    if(base.__sfTieDirectV7)return true;
     const wrapped=function(preview=false,winner='p1',kind='gold'){
-      if(winner==='tie'&&kind==='piece')return renderTieDirect();
+      if(winner==='tie'&&kind==='piece'){
+        if(renderTieDirect())return true;
+        const out=base.apply(this,arguments);
+        let retryCount=0;
+        const retry=setInterval(()=>{
+          if(renderTieDirect()||++retryCount>=20)clearInterval(retry);
+        },100);
+        return out;
+      }
       return base.apply(this,arguments);
     };
-    wrapped.__sfTieDirectV6=true;
+    wrapped.__sfTieDirectV7=true;
     window.showMedalCeremony=wrapped;
     return true;
   }
