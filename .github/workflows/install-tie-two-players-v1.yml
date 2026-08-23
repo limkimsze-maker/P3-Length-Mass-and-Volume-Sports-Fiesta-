@@ -1,172 +1,59 @@
-name: Install Sports Fiesta Ceremony Controllers
+name: Refresh Sports Fiesta Shared Scripts
+
 on:
   push:
     branches: [main]
   workflow_dispatch:
+
 permissions:
   contents: write
+
 jobs:
-  update-hub:
+  refresh-shared-scripts:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Load latest ceremony controllers and flow-test cheats
+
+      - name: Refresh shared script cache tags
         env:
           CACHE_KEY: ${{ github.sha }}
         run: |
           python - <<'PY'
           from pathlib import Path
-          import os, re
+          import os
+          import re
 
-          version = os.environ.get('CACHE_KEY', 'latest')[:12]
-
-          # Add one shared flow-test panel to the common award bridge. Because every
-          # practice supplies data-practice to this bridge, the same four buttons
-          # work for all 11 practices without touching their individual game logic.
-          awards = Path('sports-fiesta-awards-v1.js')
-          a = awards.read_text(encoding='utf-8')
-          marker = '/* SF_FLOW_CHEAT_V1 */'
-          if marker not in a:
-              needle = '  function addCeremonyNextButton(gm, outcome, progress) {'
-              cheat_block = r'''  /* SF_FLOW_CHEAT_V1 */
-  function cheatStats(kind, total) {
-    if (kind === 'single') return {correct:[total,0], wrong:[0,0]};
-    if (kind === 'p1') return {correct:[10,7], wrong:[0,3]};
-    if (kind === 'p2') return {correct:[7,10], wrong:[3,0]};
-    return {correct:[8,8], wrong:[2,2]};
-  }
-
-  function cheatFinish(kind) {
-    if (!['single','p1','p2','tie'].includes(kind)) return;
-    if (document.querySelector('iframe[title="Sports Fiesta medal ceremony"]')) return;
-
-    const total = Math.max(1, Number(questionTotal()) || 12);
-    const fake = cheatStats(kind, total);
-    const previousStats = window.__sportsFiestaAttemptStats;
-    window.__sportsFiestaAttemptStats = fake;
-
-    let gm, outcome;
-    if (kind === 'single') {
-      gm = 1;
-      outcome = {winner:'p1', perfect:true, score:total, total};
-    } else {
-      gm = 2;
-      outcome = {winner:kind, perfect:false};
-    }
-
-    try {
-      handledResult = true;
-      const progress = updateProgress(gm, outcome);
-      showCeremony(gm, outcome, progress);
-    } finally {
-      setTimeout(() => {
-        if (window.__sportsFiestaAttemptStats === fake) {
-          if (previousStats == null) delete window.__sportsFiestaAttemptStats;
-          else window.__sportsFiestaAttemptStats = previousStats;
-        }
-      }, 0);
-    }
-  }
-  window.__sportsFiestaCheatFinish = cheatFinish;
-
-  function installFlowCheatPanel() {
-    if (document.getElementById('sfFlowCheatPanel')) return;
-
-    const style = document.createElement('style');
-    style.id = 'sfFlowCheatStyle';
-    style.textContent = `
-      #sfFlowCheatPanel{position:fixed;right:12px;bottom:12px;z-index:2147483000;font-family:"Trebuchet MS",Arial,sans-serif;text-align:left}
-      #sfFlowCheatToggle{border:2px solid #fff;border-radius:999px;padding:9px 13px;background:#6d35c7;color:#fff;font-weight:1000;font-size:13px;box-shadow:0 5px 16px rgba(0,0,0,.28);cursor:pointer}
-      #sfFlowCheatMenu{display:none;width:min(268px,88vw);margin-top:8px;padding:12px;border:3px solid #d8c8ff;border-radius:17px;background:rgba(255,255,255,.98);box-shadow:0 12px 30px rgba(0,0,0,.28)}
-      #sfFlowCheatPanel.open #sfFlowCheatMenu{display:block}
-      #sfFlowCheatMenu strong{display:block;color:#4c268d;font-size:14px;margin-bottom:7px;text-align:center}
-      #sfFlowCheatMenu button{display:block;width:100%;margin:6px 0;border:0;border-radius:11px;padding:9px 10px;font-size:13px;font-weight:1000;cursor:pointer;box-shadow:0 3px 0 rgba(0,0,0,.14)}
-      #sfFlowCheatMenu button[data-sf-cheat="single"]{background:#ffe272;color:#5d4300}
-      #sfFlowCheatMenu button[data-sf-cheat="p1"]{background:#dcecff;color:#144e88}
-      #sfFlowCheatMenu button[data-sf-cheat="p2"]{background:#ffe0e5;color:#8b2638}
-      #sfFlowCheatMenu button[data-sf-cheat="tie"]{background:#e6f7e8;color:#246b31}
-      #sfFlowCheatMenu small{display:block;margin-top:8px;color:#667788;font-size:10px;line-height:1.3;text-align:center}
-      @media(max-width:600px){#sfFlowCheatPanel{right:7px;bottom:7px}#sfFlowCheatToggle{padding:7px 10px;font-size:11px}#sfFlowCheatMenu{width:min(235px,86vw);padding:9px}#sfFlowCheatMenu button{padding:7px 8px;font-size:11px;margin:5px 0}}
-    `;
-    document.head.appendChild(style);
-
-    const panel = document.createElement('div');
-    panel.id = 'sfFlowCheatPanel';
-    panel.innerHTML = `
-      <button id="sfFlowCheatToggle" type="button" aria-expanded="false">🧪 CHEAT SOLVE</button>
-      <div id="sfFlowCheatMenu">
-        <strong>FLOW TEST • PRACTICE ${PRACTICE_ID}</strong>
-        <button type="button" data-sf-cheat="single">👤 1 Player — P1 Perfect</button>
-        <button type="button" data-sf-cheat="p1">🔵 2 Players — P1 Wins</button>
-        <button type="button" data-sf-cheat="p2">🔴 2 Players — P2 Wins</button>
-        <button type="button" data-sf-cheat="tie">🤝 2 Players — Tie</button>
-        <small>Testing uses the real saved progress + award flow. The 1-player button records this practice as perfectly completed.</small>
-      </div>`;
-    document.body.appendChild(panel);
-
-    const toggle = panel.querySelector('#sfFlowCheatToggle');
-    toggle.addEventListener('click', () => {
-      const open = panel.classList.toggle('open');
-      toggle.setAttribute('aria-expanded', String(open));
-    });
-    panel.querySelectorAll('[data-sf-cheat]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        panel.classList.remove('open');
-        toggle.setAttribute('aria-expanded','false');
-        cheatFinish(btn.dataset.sfCheat);
-      });
-    });
-  }
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', installFlowCheatPanel, {once:true});
-  } else {
-    installFlowCheatPanel();
-  }
-
-'''
-              if needle not in a:
-                  raise SystemExit('Could not find award bridge insertion point')
-              a = a.replace(needle, cheat_block + needle, 1)
-              awards.write_text(a, encoding='utf-8')
-
-          # Refresh the hub controller tags and every existing awards-bridge tag so
-          # browsers do not keep an older copy of the cheat-free script.
           p = Path('index.html')
           s = p.read_text(encoding='utf-8')
+          version = os.environ.get('CACHE_KEY', 'latest')[:12]
           updated = s
 
-          tie_tag = f'<script src="tie-ceremony-two-players-v1.js?v={version}"></script>'
-          tie_pattern = r'<script\s+src=["\']tie-ceremony-two-players-v1\.js(?:\?[^"\']*)?["\']\s*></script>'
-          if re.search(tie_pattern, updated):
-              updated = re.sub(tie_pattern, tie_tag, updated, count=1)
-          else:
-              updated = updated.replace('</body>', tie_tag + '\n</body>', 1)
+          def refresh_file(text, filename):
+              pattern = re.compile(
+                  r'(<script\b[^>]*\bsrc=["\'][^"\']*' +
+                  re.escape(filename) +
+                  r')(?:\?[^"\']*)?(["\'][^>]*></script>)'
+              )
+              return pattern.sub(lambda m: m.group(1) + '?v=' + version + m.group(2), text)
 
-          preview_tag = f'<script src="sports-fiesta-preview-menu-v1.js?v={version}"></script>'
-          preview_pattern = r'<script\s+src=["\']sports-fiesta-preview-menu-v1\.js(?:\?[^"\']*)?["\']\s*></script>'
-          if re.search(preview_pattern, updated):
-              updated = re.sub(preview_pattern, preview_tag, updated, count=1)
-          else:
-              award_pattern = r'(<script\s+src=["\']sports-fiesta-award-ui-v2\.js(?:\?[^"\']*)?["\']\s*></script>)'
-              if re.search(award_pattern, updated):
-                  updated = re.sub(award_pattern, r'\1\n' + preview_tag, updated, count=1)
-              else:
-                  updated = updated.replace('</body>', preview_tag + '\n</body>', 1)
-
-          awards_tag_pattern = r'(<script\b[^>]*\bsrc=["\'][^"\']*sports-fiesta-awards-v1\.js)(?:\?[^"\']*)?(["\'][^>]*></script>)'
-          updated = re.sub(awards_tag_pattern, lambda m: m.group(1) + '?v=' + version + m.group(2), updated)
+          updated = refresh_file(updated, 'sports-fiesta-awards-v1.js')
+          updated = refresh_file(updated, 'tie-ceremony-two-players-v1.js')
+          updated = refresh_file(updated, 'sports-fiesta-preview-menu-v1.js')
 
           if updated != s:
               p.write_text(updated, encoding='utf-8')
           PY
+
           node --check sports-fiesta-awards-v1.js
-      - name: Commit update
+          node --check sports-fiesta-preview-menu-v1.js
+          node --check tie-ceremony-two-players-v1.js
+
+      - name: Commit refreshed cache tags
         run: |
           if git diff --quiet; then exit 0; fi
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add index.html sports-fiesta-awards-v1.js
-          git commit -m "Add flow cheat buttons to all practices"
+          git add index.html
+          git commit -m "Refresh Sports Fiesta shared scripts"
           git push
