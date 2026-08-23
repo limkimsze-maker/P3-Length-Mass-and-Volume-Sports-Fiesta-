@@ -275,11 +275,10 @@
       e.preventDefault?.();
       e.stopPropagation?.();
     }
-    try {
-      window.top.location.href = HUB_URL;
-    } catch (_) {
-      window.location.href = HUB_URL;
-    }
+    /* Replace the current practice browsing context. This succeeds both when
+       the practice is opened normally and when it is embedded by another page;
+       targeting window.top can be blocked by the embedding page. */
+    window.location.replace(HUB_URL);
     return false;
   }
 
@@ -317,11 +316,7 @@
         const d = w.document;
         w.__sportsFiestaBridgeWinner = winner;
         w.__sportsFiestaBridgeMode = gm;
-        w.goSportsFiestaHome = goHubNow;
-
-        d.querySelectorAll('.mc-home,#sfCeremonyBackHome').forEach(el => {
-          el.onclick = goHubNow;
-        });
+        d.querySelectorAll('.mc-home,#sfCeremonyBackHome').forEach(el => el.remove());
 
         d.body.classList.remove('cover-on');
         const cover = d.getElementById('fiestaCover');
@@ -341,7 +336,7 @@
         };
 
         const fresh = d.createElement('script');
-        fresh.src = HUB_URL + 'sports-fiesta-award-ui-v2.js?v=20260824returnv2';
+        fresh.src = HUB_URL + 'sports-fiesta-award-ui-v2.js?v=20260824returnv3';
         fresh.onload = playPiece;
         fresh.onerror = playPiece;
         d.head.appendChild(fresh);

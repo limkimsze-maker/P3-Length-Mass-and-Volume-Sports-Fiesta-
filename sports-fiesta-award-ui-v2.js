@@ -4,6 +4,9 @@
      This runs BEFORE the bridge duplicate guard because the practice result bridge
      may inject a fresh copy after the hub has already loaded an older copy. */
   const SF_HUB_URL = 'https://limkimsze-maker.github.io/P3-Length-Mass-and-Volume-Sports-Fiesta-/';
+  const SF_IS_COMPLETION_BRIDGE = /^award-v/.test(
+    new URLSearchParams(location.search).get('ceremonyBridge') || ''
+  );
   function sfGoHub(e) {
     if (e) {
       e.preventDefault?.();
@@ -23,6 +26,13 @@
     const ceremony = document.getElementById('medalCeremony');
     const card = ceremony?.querySelector('.mc-card');
     if (!card) return false;
+
+    /* A completed practice supplies one parent-level return button. Keep the
+       animation itself free of a second, competing Back to Hub control. */
+    if (SF_IS_COMPLETION_BRIDGE) {
+      card.querySelectorAll('.mc-home,#sfCeremonyBackHome').forEach(btn => btn.remove());
+      return true;
+    }
 
     let btn = document.getElementById('sfCeremonyBackHome') || card.querySelector('.mc-home');
     if (!btn) {
@@ -45,10 +55,6 @@
   }
   installReliableCeremonyReturn();
   [0,40,120,300,700,1200,2200,4000,7000].forEach(ms => setTimeout(installReliableCeremonyReturn, ms));
-  if (!window.__sfReliableCeremonyReturnObserverV1) {
-    window.__sfReliableCeremonyReturnObserverV1 = true;
-    new MutationObserver(installReliableCeremonyReturn).observe(document.documentElement, {subtree:true, childList:true});
-  }
 
   if (window.__sportsFiestaPreviewAwardBridgeV2) return;
   window.__sportsFiestaPreviewAwardBridgeV2 = true;
