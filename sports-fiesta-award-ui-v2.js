@@ -1,5 +1,49 @@
 /* SPORTS FIESTA AWARD UI — use the hub preview animation as the single source of truth */
 (() => {
+  /* SF_RELIABLE_CEREMONY_RETURN_V1
+     This runs BEFORE the bridge duplicate guard because the practice result bridge
+     may inject a fresh copy after the hub has already loaded an older copy. */
+  const SF_HUB_URL = 'https://limkimsze-maker.github.io/P3-Length-Mass-and-Volume-Sports-Fiesta-/';
+  function sfGoHub(e) {
+    if (e) {
+      e.preventDefault?.();
+      e.stopPropagation?.();
+    }
+    try {
+      if (window.top) {
+        window.top.location.href = SF_HUB_URL;
+        return false;
+      }
+    } catch (_) {}
+    window.location.href = SF_HUB_URL;
+    return false;
+  }
+  function installReliableCeremonyReturn() {
+    window.goSportsFiestaHome = sfGoHub;
+    const ceremony = document.getElementById('medalCeremony');
+    const card = ceremony?.querySelector('.mc-card');
+    if (!card) return false;
+
+    let btn = document.getElementById('sfCeremonyBackHome') || card.querySelector('.mc-home');
+    if (!btn) {
+      btn = document.createElement('button');
+      btn.id = 'sfCeremonyBackHome';
+      btn.type = 'button';
+      card.appendChild(btn);
+    }
+    btn.textContent = '← Back to Hub';
+    btn.setAttribute('aria-label', 'Back to Sports Fiesta Practice Hub');
+    btn.onclick = sfGoHub;
+    btn.style.cssText = 'position:absolute!important;left:14px!important;top:58px!important;z-index:2147483647!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;min-width:155px!important;min-height:48px!important;padding:10px 15px!important;border:3px solid #fff!important;border-radius:15px!important;background:#1769aa!important;color:#fff!important;font:900 16px/1.1 "Trebuchet MS",Arial,sans-serif!important;box-shadow:0 5px 0 #0b4778,0 8px 18px rgba(0,0,0,.2)!important;cursor:pointer!important;visibility:visible!important;opacity:1!important;pointer-events:auto!important;';
+    return true;
+  }
+  installReliableCeremonyReturn();
+  [0,40,120,300,700,1200,2200,4000,7000].forEach(ms => setTimeout(installReliableCeremonyReturn, ms));
+  if (!window.__sfReliableCeremonyReturnObserverV1) {
+    window.__sfReliableCeremonyReturnObserverV1 = true;
+    new MutationObserver(installReliableCeremonyReturn).observe(document.documentElement, {subtree:true, childList:true});
+  }
+
   if (window.__sportsFiestaPreviewAwardBridgeV2) return;
   window.__sportsFiestaPreviewAwardBridgeV2 = true;
 
@@ -191,6 +235,7 @@
     }
 
     forceVisible();
+    installReliableCeremonyReturn();
     return out;
   };
 
@@ -244,6 +289,7 @@
     }
 
     setPreviewCopy(scenario);
+    installReliableCeremonyReturn();
   }
 
   window.sfPreviewScenario = previewScenario;
