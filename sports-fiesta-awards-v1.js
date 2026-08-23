@@ -267,6 +267,22 @@
     msg.innerHTML = `<b>${well}</b><br>Player 1 — Correct: ${stats.c1} | Wrong: ${stats.w1}<br>Player 2 — Correct: ${stats.c2} | Wrong: ${stats.w2}`;
   }
 
+  /* The ceremony lives in a full-screen iframe. Keep the return action in the
+     parent practice as well, so it remains usable even if an older cached copy
+     of the hub's ceremony UI is loaded inside the frame. */
+  function goHubNow(e) {
+    if (e) {
+      e.preventDefault?.();
+      e.stopPropagation?.();
+    }
+    try {
+      window.top.location.href = HUB_URL;
+    } catch (_) {
+      window.location.href = HUB_URL;
+    }
+    return false;
+  }
+
   function showCeremony(gm, outcome, progress) {
     const winner = gm === 1 ? 'p1' : outcome.winner;
     const stats = attemptStats();
@@ -277,9 +293,23 @@
     frame.src = HUB_URL + '?ceremonyBridge=award-v8&mode=' + gm + '&winner=' + encodeURIComponent(winner) + '&t=' + Date.now();
     Object.assign(frame.style, {
       position:'fixed', inset:'0', width:'100%', height:'100%', border:'0',
-      zIndex:'2147483647', background:'#185b9d'
+      zIndex:'2147483600', background:'#185b9d'
     });
     document.body.appendChild(frame);
+
+    const returnBtn = document.createElement('button');
+    returnBtn.id = 'sfCeremonyReturnHub';
+    returnBtn.type = 'button';
+    returnBtn.textContent = '← Back to Hub';
+    returnBtn.setAttribute('aria-label', 'Back to Sports Fiesta Practice Hub');
+    returnBtn.onclick = goHubNow;
+    returnBtn.style.cssText = 'position:fixed!important;left:14px!important;top:14px!important;z-index:2147483647!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;min-width:150px!important;min-height:48px!important;padding:10px 16px!important;border:3px solid #fff!important;border-radius:15px!important;background:#1769aa!important;color:#fff!important;font:900 16px/1.1 "Trebuchet MS",Arial,sans-serif!important;box-shadow:0 5px 0 #0b4778,0 8px 18px rgba(0,0,0,.2)!important;cursor:pointer!important;visibility:visible!important;opacity:1!important;';
+    document.body.appendChild(returnBtn);
+
+    const cleanupCeremony = () => {
+      frame.remove();
+      returnBtn.remove();
+    };
 
     frame.onload = () => {
       try {
@@ -287,6 +317,11 @@
         const d = w.document;
         w.__sportsFiestaBridgeWinner = winner;
         w.__sportsFiestaBridgeMode = gm;
+        w.goSportsFiestaHome = goHubNow;
+
+        d.querySelectorAll('.mc-home,#sfCeremonyBackHome').forEach(el => {
+          el.onclick = goHubNow;
+        });
 
         d.body.classList.remove('cover-on');
         const cover = d.getElementById('fiestaCover');
@@ -306,7 +341,7 @@
         };
 
         const fresh = d.createElement('script');
-        fresh.src = HUB_URL + 'sports-fiesta-award-ui-v2.js?v=20260823debugv6';
+        fresh.src = HUB_URL + 'sports-fiesta-award-ui-v2.js?v=20260824returnv2';
         fresh.onload = playPiece;
         fresh.onerror = playPiece;
         d.head.appendChild(fresh);
@@ -325,16 +360,16 @@
         const close = d.querySelector('#medalCeremony .mc-close');
         if (close) close.addEventListener('click', () => {
           if (progress.awardGoldNow && stage === 'piece') setTimeout(showGold, 90);
-          else setTimeout(() => frame.remove(), 0);
+          else setTimeout(cleanupCeremony, 0);
         });
         d.addEventListener('keydown', e => {
           if (e.key !== 'Escape') return;
           if (progress.awardGoldNow && stage === 'piece') setTimeout(showGold, 90);
-          else setTimeout(() => frame.remove(), 0);
+          else setTimeout(cleanupCeremony, 0);
         });
       } catch (e) {
         console.warn('Sports Fiesta ceremony could not open', e);
-        frame.remove();
+        cleanupCeremony();
       }
     };
   }

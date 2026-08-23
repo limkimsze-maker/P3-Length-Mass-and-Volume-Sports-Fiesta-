@@ -1,8 +1,5 @@
 name: Deploy Shared Medal Hook
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
 permissions:
   contents: write

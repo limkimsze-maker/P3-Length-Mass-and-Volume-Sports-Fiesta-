@@ -31,10 +31,16 @@
       btn.type = 'button';
       card.appendChild(btn);
     }
-    btn.textContent = '← Back to Hub';
-    btn.setAttribute('aria-label', 'Back to Sports Fiesta Practice Hub');
-    btn.onclick = sfGoHub;
-    btn.style.cssText = 'position:absolute!important;left:14px!important;top:58px!important;z-index:2147483647!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;min-width:155px!important;min-height:48px!important;padding:10px 15px!important;border:3px solid #fff!important;border-radius:15px!important;background:#1769aa!important;color:#fff!important;font:900 16px/1.1 "Trebuchet MS",Arial,sans-serif!important;box-shadow:0 5px 0 #0b4778,0 8px 18px rgba(0,0,0,.2)!important;cursor:pointer!important;visibility:visible!important;opacity:1!important;pointer-events:auto!important;';
+    /* Keep every write idempotent. This function is called by a MutationObserver;
+       replacing text on every callback creates another mutation and can freeze
+       the ceremony in an endless observer loop. */
+    if (btn.textContent !== '← Back to Hub') btn.textContent = '← Back to Hub';
+    if (btn.getAttribute('aria-label') !== 'Back to Sports Fiesta Practice Hub') {
+      btn.setAttribute('aria-label', 'Back to Sports Fiesta Practice Hub');
+    }
+    if (btn.onclick !== sfGoHub) btn.onclick = sfGoHub;
+    const buttonStyle = 'position:absolute!important;left:14px!important;top:58px!important;z-index:2147483647!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;min-width:155px!important;min-height:48px!important;padding:10px 15px!important;border:3px solid #fff!important;border-radius:15px!important;background:#1769aa!important;color:#fff!important;font:900 16px/1.1 "Trebuchet MS",Arial,sans-serif!important;box-shadow:0 5px 0 #0b4778,0 8px 18px rgba(0,0,0,.2)!important;cursor:pointer!important;visibility:visible!important;opacity:1!important;pointer-events:auto!important;';
+    if (btn.style.cssText !== buttonStyle) btn.style.cssText = buttonStyle;
     return true;
   }
   installReliableCeremonyReturn();

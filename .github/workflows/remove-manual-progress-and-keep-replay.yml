@@ -1,7 +1,5 @@
 name: Remove Manual Progress and Keep Replay
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 permissions:
   contents: write

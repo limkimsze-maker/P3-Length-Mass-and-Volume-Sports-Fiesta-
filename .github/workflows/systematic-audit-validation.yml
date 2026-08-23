@@ -26,7 +26,7 @@ jobs:
             htmls[pid]=html
             for fn in required[pid]:
               if not re.search(rf'function\s+{re.escape(fn)}\s*\(',html): errors.append(f'P{pid}: missing required function {fn}()')
-            if 'sports-fiesta-back-to-hub-v1.js?v=20260812a' not in html: errors.append(f'P{pid}: Back to Fiesta Hub button script not loaded')
+            if 'sports-fiesta-awards-v1.js?v=20260819b' not in html: errors.append(f'P{pid}: shared result and return flow not loaded')
             inline=re.findall(r'<script(?![^>]*\bsrc=)[^>]*>(.*?)</script>',html,re.S|re.I)
             for n,js in enumerate(inline,1):
               f=tmp/f'p{pid}-inline-{n}.js'; f.write_text(js); r=subprocess.run(['node','--check',str(f)],capture_output=True,text=True)
@@ -52,5 +52,5 @@ jobs:
           if errors:
             for e in errors: print(f'::error title=Sports Fiesta Audit::{e.replace("%","%25").replace(chr(13),"%0D").replace(chr(10),"%0A")}')
             sys.exit(1)
-          print('PASS: all 11 practices passed source checks and all 11 load the Back to Fiesta Hub button.')
+          print('PASS: all 11 practices passed source checks and load the shared result and return flow.')
           PY

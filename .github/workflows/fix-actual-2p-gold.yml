@@ -1,7 +1,5 @@
 name: Fix Actual 2P Gold
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 permissions:
   contents: write
