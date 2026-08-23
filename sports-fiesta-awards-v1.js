@@ -1,11 +1,15 @@
-/* Sports Fiesta awards and shared project helpers */
+/* Sports Fiesta result bridge — games choose the result; hub preview supplies the animation */
 (() => {
   const script = document.currentScript;
   const PRACTICE_ID = Number(script?.dataset?.practice || 0);
   const SPORT = script?.dataset?.sport || `Practice ${PRACTICE_ID}`;
-  if (!PRACTICE_ID || window.__sportsFiestaAwardsOnlyV1) return;
-  window.__sportsFiestaAwardsOnlyV1 = true;
+  if (!PRACTICE_ID || window.__sportsFiestaAwardsOnlyV2) return;
+  window.__sportsFiestaAwardsOnlyV2 = true;
 
+  const HUB_KEY = 'sportsFiestaHubProgress_v1';
+  const HUB_URL = 'https://limkimsze-maker.github.io/P3-Length-Mass-and-Volume-Sports-Fiesta-/';
+
+  /* Keep the two small practice-specific presentation fixes. */
   if (PRACTICE_ID === 10 && typeof window.markerStripSVG === 'function') {
     const originalMarkerStripSVG = window.markerStripSVG;
     window.markerStripSVG = function(a, extra) {
@@ -24,8 +28,7 @@
         if (input.closest('.sf-unit-pair')) return;
         const unitSpan = input.nextElementSibling;
         if (!unitSpan) return;
-        const text = unitSpan.textContent || '';
-        const match = text.match(/^\s*ml\b(.*)$/i);
+        const match = (unitSpan.textContent || '').match(/^\s*ml\b(.*)$/i);
         if (!match) return;
         const pair = document.createElement('span');
         pair.className = 'sf-unit-pair';
@@ -44,24 +47,18 @@
     setTimeout(keepMlWithAnswer, 0);
   }
 
-  const HUB_KEY = 'sportsFiestaHubProgress_v1';
-  const HUB_URL = 'https://limkimsze-maker.github.io/P3-Length-Mass-and-Volume-Sports-Fiesta-/';
-
-  function readHubData() {
-    try { return JSON.parse(localStorage.getItem(HUB_KEY) || '{}') || {}; }
-    catch (_) { return {}; }
-  }
-
-  // Snapshot the complete pre-game record. This is the protected 1-player record
-  // that a later 2-player match is not allowed to overwrite.
-  let preservedSingleRecord = {...(readHubData()[PRACTICE_ID] || {})};
-
   const retryScript = document.createElement('script');
   retryScript.src = HUB_URL + 'sports-fiesta-retry-v1.js?v=20260823f';
   retryScript.dataset.practice = String(PRACTICE_ID);
   retryScript.async = false;
   document.head.appendChild(retryScript);
 
+  function readHubData() {
+    try { return JSON.parse(localStorage.getItem(HUB_KEY) || '{}') || {}; }
+    catch (_) { return {}; }
+  }
+
+  let preservedSingleRecord = {...(readHubData()[PRACTICE_ID] || {})};
   let handledResult = false;
   let timer = null;
 
@@ -125,14 +122,13 @@
     let c2 = competition && Number.isFinite(Number(competition[1])) ? Number(competition[1]) : p2;
     const result = document.getElementById('results');
     const text = (result?.innerText || '').replace(/\s+/g, ' ').trim();
+
     if (gm === 1 && (p1 == null || total == null)) {
       const fraction = text.match(/(\d+)\s*(?:\/|out of)\s*(\d+)/i);
       if (fraction) {
         p1 = Number(fraction[1]);
-        if (total == null) {
-          const t = Number(fraction[2]);
-          if (Number.isFinite(t)) return {p1,p2,c1,c2,total:t,text};
-        }
+        const t = Number(fraction[2]);
+        if (Number.isFinite(t) && total == null) return {p1,p2,c1,c2,total:t,text};
       }
     }
     return {p1,p2,c1,c2,total,text};
@@ -140,7 +136,14 @@
 
   function resultOutcome(gm) {
     const s = readState(gm);
-    if (gm === 1) return {winner:'p1',perfect:s.p1!=null&&s.total!=null&&s.total>0&&s.p1===s.total,score:s.p1,total:s.total};
+    if (gm === 1) {
+      return {
+        winner:'p1',
+        perfect:s.p1 != null && s.total != null && s.total > 0 && s.p1 === s.total,
+        score:s.p1,
+        total:s.total
+      };
+    }
 
     if (PRACTICE_ID === 1) {
       if (/Player\s*2\s+Wins\s+the\s+Race|Player\s*2\s+reached\s+the\s+finishing\s+line\s+first/i.test(s.text)) return {winner:'p2',perfect:false};
@@ -148,7 +151,7 @@
       if (s.c2 != null && s.c2 >= 6 && !(s.c1 != null && s.c1 >= 6)) return {winner:'p2',perfect:false};
       if (s.c1 != null && s.c1 >= 6 && !(s.c2 != null && s.c2 >= 6)) return {winner:'p1',perfect:false};
       if (s.c1 == null || s.c2 == null) return {winner:'tie',perfect:false};
-      return {winner:s.c1===s.c2?'tie':(s.c1>s.c2?'p1':'p2'),perfect:false};
+      return {winner:s.c1 === s.c2 ? 'tie' : (s.c1 > s.c2 ? 'p1' : 'p2'),perfect:false};
     }
 
     const fairWinner = window.__sportsFiestaFairWinner;
@@ -156,7 +159,7 @@
     const trackedWinner = attemptWinner();
     if (trackedWinner) return {winner:trackedWinner,perfect:false};
     if (s.c1 == null || s.c2 == null) return {winner:'tie',perfect:false};
-    return {winner:s.c1===s.c2?'tie':(s.c1>s.c2?'p1':'p2'),perfect:false};
+    return {winner:s.c1 === s.c2 ? 'tie' : (s.c1 > s.c2 ? 'p1' : 'p2'),perfect:false};
   }
 
   function qualifiesGoldRecord(x) {
@@ -164,170 +167,216 @@
   }
 
   function goldPieceCount(data) {
-    let n=0; for(let i=1;i<=11;i++) if(qualifiesGoldRecord(data[i])) n++; return n;
+    let n = 0;
+    for (let i = 1; i <= 11; i++) if (qualifiesGoldRecord(data[i])) n++;
+    return n;
   }
 
-  function updateProgress(gm,outcome) {
-    const data=readHubData();
-    const old=data[PRACTICE_ID]||{};
-    const piecesBefore=goldPieceCount(data);
-    const stats=attemptStats();
+  function updateProgress(gm, outcome) {
+    const data = readHubData();
+    const old = data[PRACTICE_ID] || {};
+    const piecesBefore = goldPieceCount(data);
+    const stats = attemptStats();
 
-    if(gm===1){
-      const wasPerfect=qualifiesGoldRecord(old)||qualifiesGoldRecord(preservedSingleRecord);
-      const nowPerfect=wasPerfect||!!outcome.perfect;
-      const oldBest=Number(old.singlePlayerBestScore),savedBest=Number(preservedSingleRecord.singlePlayerBestScore),current=Number(outcome.score);
-      const best=[oldBest,savedBest,current].filter(Number.isFinite).reduce((a,b)=>Math.max(a,b),-Infinity);
-      data[PRACTICE_ID]={...old,completed:true,singlePlayerCompleted:true,singlePlayerPerfect:nowPerfect,singlePlayerBestScore:Number.isFinite(best)?best:(old.singlePlayerBestScore??null),singlePlayerTotal:Number.isFinite(Number(outcome.total))?Number(outcome.total):(old.singlePlayerTotal??null),perfectSingle:nowPerfect,pieceEarned:nowPerfect,awardQualified:nowPerfect,verified:true,source:'game-v8',awardRules:'v8-single-vs-duel-separated',updatedAt:new Date().toISOString(),lastMode:1,lastWinner:old.lastWinner??0,lastAwardWinner:nowPerfect?1:(old.lastAwardWinner??0)};
-      preservedSingleRecord={...data[PRACTICE_ID]};
-    }else{
-      const protectedRecord=preservedSingleRecord||{};
-      const singlePerfect=qualifiesGoldRecord(protectedRecord);
-      // Restore the complete pre-match record, then append only separate 2-player
-      // history. This prevents any native per-game 2-player save from erasing a
-      // score, completion flag, timestamp or other field belonging to 1-player.
-      data[PRACTICE_ID]={
+    if (gm === 1) {
+      const wasPerfect = qualifiesGoldRecord(old) || qualifiesGoldRecord(preservedSingleRecord);
+      const nowPerfect = wasPerfect || !!outcome.perfect;
+      const scores = [Number(old.singlePlayerBestScore), Number(preservedSingleRecord.singlePlayerBestScore), Number(outcome.score)].filter(Number.isFinite);
+      const best = scores.length ? Math.max(...scores) : null;
+      data[PRACTICE_ID] = {
+        ...old,
+        completed:true,
+        singlePlayerCompleted:true,
+        singlePlayerPerfect:nowPerfect,
+        singlePlayerBestScore:best,
+        singlePlayerTotal:Number.isFinite(Number(outcome.total)) ? Number(outcome.total) : (old.singlePlayerTotal ?? null),
+        perfectSingle:nowPerfect,
+        pieceEarned:nowPerfect,
+        awardQualified:nowPerfect,
+        verified:true,
+        source:'game-v9-preview-bridge',
+        awardRules:'single-vs-duel-separated',
+        updatedAt:new Date().toISOString(),
+        lastMode:1
+      };
+      preservedSingleRecord = {...data[PRACTICE_ID]};
+    } else {
+      const protectedRecord = preservedSingleRecord || {};
+      const singlePerfect = qualifiesGoldRecord(protectedRecord);
+      data[PRACTICE_ID] = {
         ...old,
         ...protectedRecord,
         pieceEarned:singlePerfect,
         awardQualified:singlePerfect,
-        perfectSingle:!!(protectedRecord.perfectSingle||protectedRecord.singlePlayerPerfect),
-        singlePlayerPerfect:!!(protectedRecord.singlePlayerPerfect||protectedRecord.perfectSingle),
-        awardRules:'v8-single-vs-duel-separated',
+        perfectSingle:!!(protectedRecord.perfectSingle || protectedRecord.singlePlayerPerfect),
+        singlePlayerPerfect:!!(protectedRecord.singlePlayerPerfect || protectedRecord.perfectSingle),
+        awardRules:'single-vs-duel-separated',
         twoPlayerLastWinner:outcome.winner,
         twoPlayerLastAttemptStats:stats,
         twoPlayerUpdatedAt:new Date().toISOString()
       };
     }
 
-    const piecesAfter=goldPieceCount(data);
-    if(piecesAfter<11) delete data.__finalGoldAwarded;
-    localStorage.setItem(HUB_KEY,JSON.stringify(data));
-    return {qualifies:gm===2?true:!!outcome.perfect,newlyEarned:gm===1&&!!outcome.perfect&&piecesAfter>piecesBefore,piecesBefore,piecesAfter};
-  }
-
-  function goldAlreadyAwarded(){try{return (JSON.parse(localStorage.getItem(HUB_KEY)||'{}')||{}).__finalGoldAwarded===true}catch(_){return false}}
-  function markGoldAwarded(){try{const data=JSON.parse(localStorage.getItem(HUB_KEY)||'{}')||{};data.__finalGoldAwarded=true;localStorage.setItem(HUB_KEY,JSON.stringify(data))}catch(_){}}
-
-  function ceremonyPlayerSources(d){const cards=[...d.querySelectorAll('.playerImgWrap img.playerSvg')];return {p1:d.getElementById('fcP1')?.src||cards[0]?.src||'',p2:d.getElementById('fcP2')?.src||cards[1]?.src||''}}
-
-  function ensureCeremonyFallbackStyle(d){
-    if(d.getElementById('sfStandaloneMatchStyle'))return;
-    const st=d.createElement('style');st.id='sfStandaloneMatchStyle';st.textContent=`
-      #medalCeremony #mcMessage.sf-match-result-card{background:#fff!important;color:#111!important;text-shadow:none!important;border:2px solid rgba(0,0,0,.10)!important;border-radius:18px!important;box-shadow:0 7px 20px rgba(0,0,0,.18)!important;width:min(760px,88%)!important;max-width:760px!important;padding:12px 18px!important;line-height:1.35!important;font-size:clamp(16px,2.2vw,22px)!important;text-align:center!important;}
-      #medalCeremony #mcMessage .sf-result-winner{display:block;font-size:1.22em;font-weight:1000;margin-bottom:5px;color:#111!important}
-      #medalCeremony #mcMessage .sf-result-note{display:block;font-size:.86em;font-weight:800;margin-bottom:6px;color:#333!important}
-      #medalCeremony #mcMessage .sf-result-line{display:block;font-size:.94em;font-weight:850;color:#111!important}
-      #medalCeremony .sf-tie-player{position:absolute!important;bottom:118px!important;width:min(190px,28%)!important;height:300px!important;object-fit:contain!important;z-index:4!important;}
-      #medalCeremony #mcPlayer.sf-tie-player{left:28%!important;transform:translateX(-50%)!important;animation:sfTieLeftIn .72s cubic-bezier(.22,.9,.3,1.15) both!important}
-      #medalCeremony #mcPlayer2.sf-tie-player{left:72%!important;transform:translateX(-50%)!important;display:block!important;animation:sfTieRightIn .72s .08s cubic-bezier(.22,.9,.3,1.15) both!important}
-      @keyframes sfTieLeftIn{from{opacity:0;transform:translateX(-50%) translateX(-90px) translateY(60px) scale(.82)}to{opacity:1;transform:translateX(-50%) translateX(0) translateY(0) scale(1)}}
-      @keyframes sfTieRightIn{from{opacity:0;transform:translateX(-50%) translateX(90px) translateY(60px) scale(.82)}to{opacity:1;transform:translateX(-50%) translateX(0) translateY(0) scale(1)}}
-      #medalCeremony .sf-first-ordinal::before{content:'1st'!important;font-size:.72em!important}
-      @media(max-width:620px){#medalCeremony .sf-tie-player{width:min(145px,39vw)!important;height:230px!important;bottom:110px!important}#medalCeremony #mcPlayer.sf-tie-player{left:25%!important}#medalCeremony #mcPlayer2.sf-tie-player{left:75%!important}#medalCeremony #mcMessage.sf-match-result-card{width:92%!important;padding:9px 11px!important;font-size:15px!important}}
-    `;d.head.appendChild(st);
-  }
-
-  function markFirstAsOrdinal(d){
-    const root=d.getElementById('medalCeremony');if(!root)return;
-    root.querySelectorAll('*').forEach(el=>{
-      if(!el.children.length&&el.textContent.trim()==='1')el.textContent='1st';
-      try{const before=d.defaultView.getComputedStyle(el,'::before').content;if(before==='"1"'||before==="'1'")el.classList.add('sf-first-ordinal')}catch(_){}
-    });
-  }
-
-  function ensureTiePlayers(d,sources){
-    const player=d.getElementById('mcPlayer');if(!player)return;
-    const card=d.querySelector('#medalCeremony .mc-card');if(card)card.classList.add('tie');
-    player.classList.add('sf-tie-player');
-    if(sources.p1){player.src=sources.p1;player.alt='Player 1 — joint 1st place'}
-    let player2=d.getElementById('mcPlayer2');
-    if(!player2){player2=player.cloneNode(true);player2.id='mcPlayer2';player.parentElement?.appendChild(player2)}
-    player2.classList.add('sf-tie-player');
-    if(sources.p2){player2.src=sources.p2;player2.alt='Player 2 — joint 1st place'}
-    player2.style.setProperty('display','block','important');
-  }
-
-  function clearTiePlayers(d){
-    const card=d.querySelector('#medalCeremony .mc-card');if(card)card.classList.remove('tie');
-    const player=d.getElementById('mcPlayer');if(player){player.classList.remove('sf-tie-player');player.style.removeProperty('left');player.style.removeProperty('width');player.style.removeProperty('height');player.style.removeProperty('bottom');player.style.removeProperty('animation')}
-    const player2=d.getElementById('mcPlayer2');if(player2){player2.classList.remove('sf-tie-player');player2.style.setProperty('display','none','important')}
-  }
-
-  function renderMatchMessage(msg,winner,stats){
-    if(!msg)return;
-    const title=winner==='tie'?"It's a tie!":`Winner: ${winner==='p2'?'Player 2':'Player 1'}`;
-    const note=winner==='tie'?'Both players share 1st place and receive the match award.':'Winner receives the standalone match award.';
-    let html=`<span class="sf-result-winner">${title}</span><span class="sf-result-note">${note}</span>`;
-    if(stats){html+=`<span class="sf-result-line">Player 1 — Correct: ${stats.c1} | Wrong: ${stats.w1}</span><span class="sf-result-line">Player 2 — Correct: ${stats.c2} | Wrong: ${stats.w2}</span>`}
-    msg.classList.add('sf-match-result-card');
-    if(msg.innerHTML!==html)msg.innerHTML=html;
-  }
-
-  function enforcePieceWinner(d,winner,gm,stats){
-    ensureCeremonyFallbackStyle(d);markFirstAsOrdinal(d);
-    const banner=d.querySelector('#medalCeremony .mc-banner'),sub=d.getElementById('mcSub'),msg=d.getElementById('mcMessage'),player=d.getElementById('mcPlayer'),sources=ceremonyPlayerSources(d);
-    if(banner){const wanted=gm===2?'🏅 2-PLAYER MATCH AWARD 🏅':'🏅 1/11 MEDAL AWARD 🏅';if(banner.textContent!==wanted)banner.textContent=wanted}
-    if(sub){const wanted=gm===2?`Practice ${PRACTICE_ID} • ${SPORT} • Standalone 2-player match`:`Practice ${PRACTICE_ID} of 11 • ${SPORT}`;if(sub.textContent!==wanted)sub.textContent=wanted}
-    if(gm===2&&winner==='tie'){
-      ensureTiePlayers(d,sources);
-    }else{
-      clearTiePlayers(d);
-      if(winner==='p2'&&player&&sources.p2&&player.src!==sources.p2){player.src=sources.p2;player.alt='Player 2 on the rostrum'}
-      else if(winner==='p1'&&player&&sources.p1&&player.src!==sources.p1){player.src=sources.p1;player.alt='Player 1 on the rostrum'}
-    }
-    if(gm===2)renderMatchMessage(msg,winner,stats);
-    else if(msg&&msg.textContent!=='Perfect score! Player 1 earns a 1/11 medal!')msg.textContent='Perfect score! Player 1 earns a 1/11 medal!';
-  }
-
-  function showCeremony(gm,outcome,progress){
-    const winner=gm===1?'p1':outcome.winner;
-    const stats=attemptStats();
-    const awardGoldNow=gm===1&&progress.qualifies&&progress.piecesAfter===11&&!goldAlreadyAwarded();
-    const frame=document.createElement('iframe');
-    frame.title='Sports Fiesta medal ceremony';
-    frame.src=HUB_URL+'?ceremonyBridge=award-v8&mode='+gm+'&winner='+encodeURIComponent(winner)+'&t='+Date.now();
-    Object.assign(frame.style,{position:'fixed',inset:'0',width:'100%',height:'100%',border:'0',zIndex:'2147483647',background:'#185b9d'});
-    document.body.appendChild(frame);
-    frame.onload=()=>{
-      try{
-        const w=frame.contentWindow,d=w.document;
-        w.__sportsFiestaBridgeWinner=winner;w.__sportsFiestaBridgeMode=gm;
-        d.body.classList.remove('cover-on');const cover=d.getElementById('fiestaCover');if(cover)cover.style.display='none';const app=d.querySelector('.app');if(app)app.style.setProperty('display','none','important');d.body.style.padding='0';d.body.style.overflow='hidden';
-        let stage='piece',guard=null,started=false;
-        const showPiece=()=>{
-          if(started)return;started=true;
-          // A real 2-player game is never a teacher preview. The fresh award UI is
-          // loaded below with a new query string so stale hub cache cannot bypass
-          // the tie/player-specific animation.
-          w.showMedalCeremony(false,winner,'piece');
-          enforcePieceWinner(d,winner,gm,stats);
-          const medal=d.getElementById('medalCeremony');
-          if(medal&&w.MutationObserver){guard?.disconnect?.();guard=new w.MutationObserver(()=>{if(stage==='piece')enforcePieceWinner(d,winner,gm,stats)});guard.observe(medal,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['src','class','style']})}
-          [80,650,980,1450,1980,2300,3200].forEach(ms=>setTimeout(()=>{if(stage==='piece')enforcePieceWinner(d,winner,gm,stats)},ms));
-        };
-        const fresh=d.createElement('script');
-        fresh.src=HUB_URL+'sports-fiesta-award-ui-v2.js?v=20260823tie2';
-        fresh.onload=showPiece;fresh.onerror=showPiece;d.head.appendChild(fresh);
-        setTimeout(showPiece,900);
-        const showGold=()=>{stage='gold';guard?.disconnect?.();markGoldAwarded();w.showMedalCeremony(false,'p1','gold');const sub=d.getElementById('mcSub'),msg=d.getElementById('mcMessage');if(sub)sub.textContent='All 11 Sports Fiesta 1-player lessons completed perfectly!';if(msg)msg.textContent='🏆 Player 1 receives the Sports Fiesta GOLD MEDAL! 🏆'};
-        const close=d.querySelector('#medalCeremony .mc-close');if(close)close.addEventListener('click',()=>{if(awardGoldNow&&stage==='piece')setTimeout(showGold,90);else{guard?.disconnect?.();setTimeout(()=>frame.remove(),0)}});
-        d.addEventListener('keydown',e=>{if(e.key!=='Escape')return;if(awardGoldNow&&stage==='piece')setTimeout(showGold,90);else{guard?.disconnect?.();setTimeout(()=>frame.remove(),0)}});
-      }catch(e){console.warn('Sports Fiesta ceremony could not open',e);frame.remove()}
+    const piecesAfter = goldPieceCount(data);
+    if (piecesAfter < 11) delete data.__finalGoldAwarded;
+    localStorage.setItem(HUB_KEY, JSON.stringify(data));
+    return {
+      qualifies:gm === 2 ? true : !!outcome.perfect,
+      piecesBefore,
+      piecesAfter,
+      awardGoldNow:gm === 1 && !!outcome.perfect && piecesAfter === 11 && data.__finalGoldAwarded !== true
     };
   }
 
-  function addCeremonyNextButton(gm,outcome,progress){
-    const result=document.getElementById('results');if(!result||!progress.qualifies)return;
-    let btn=document.getElementById('sfCeremonyNext');
-    if(!btn){btn=document.createElement('button');btn.id='sfCeremonyNext';btn.type='button';btn.textContent='Next →';btn.setAttribute('aria-label','Next to medal ceremony');btn.className='bigbtn gold';Object.assign(btn.style,{minWidth:'150px',margin:'14px auto 4px',display:'block',fontWeight:'900',fontSize:'20px'});const box=result.querySelector('.results')||result,firstButton=box.querySelector('button');if(firstButton)box.insertBefore(btn,firstButton);else box.appendChild(btn)}
-    btn.disabled=false;btn.onclick=()=>{btn.disabled=true;showCeremony(gm,outcome,progress)};
+  function markGoldAwarded() {
+    try {
+      const data = readHubData();
+      data.__finalGoldAwarded = true;
+      localStorage.setItem(HUB_KEY, JSON.stringify(data));
+    } catch (_) {}
   }
 
-  function checkResult(){
-    clearTimeout(timer);timer=setTimeout(()=>{const result=document.getElementById('results');if(!visible(result)){handledResult=false;document.getElementById('sfCeremonyNext')?.remove();return}if(handledResult)return;const gm=getMode(),outcome=resultOutcome(gm),progress=updateProgress(gm,outcome);handledResult=true;addCeremonyNextButton(gm,outcome,progress)},220);
+  function fillResultText(d, gm, winner, stats) {
+    const banner = d.querySelector('#medalCeremony .mc-banner');
+    const sub = d.getElementById('mcSub');
+    const msg = d.getElementById('mcMessage');
+
+    if (banner) banner.textContent = gm === 2 ? '🏅 2-PLAYER MATCH AWARD 🏅' : '🏅 1/11 MEDAL AWARD 🏅';
+    if (sub) sub.textContent = gm === 2
+      ? `Practice ${PRACTICE_ID} • ${SPORT}`
+      : `Practice ${PRACTICE_ID} of 11 • ${SPORT}`;
+
+    if (!msg) return;
+    if (gm === 1) {
+      msg.textContent = 'Perfect score! Player 1 earns a 1/11 gold medal piece!';
+      return;
+    }
+
+    const title = winner === 'tie' ? "It's a tie! Both players share 1st place!" : `${winner === 'p2' ? 'Player 2' : 'Player 1'} wins and earns the 1/11 gold medal piece!`;
+    if (!stats) {
+      msg.textContent = title;
+      return;
+    }
+    msg.innerHTML = `<b>${title}</b><br>Player 1 — Correct: ${stats.c1} | Wrong: ${stats.w1}<br>Player 2 — Correct: ${stats.c2} | Wrong: ${stats.w2}`;
   }
 
-  new MutationObserver(checkResult).observe(document.documentElement,{subtree:true,childList:true,attributes:true,attributeFilter:['class','style'],characterData:true});
-  window.addEventListener('load',checkResult);checkResult();
+  function showCeremony(gm, outcome, progress) {
+    const winner = gm === 1 ? 'p1' : outcome.winner;
+    const stats = attemptStats();
+    const frame = document.createElement('iframe');
+    frame.title = 'Sports Fiesta medal ceremony';
+    frame.src = HUB_URL + '?ceremonyBridge=award-v8&mode=' + gm + '&winner=' + encodeURIComponent(winner) + '&t=' + Date.now();
+    Object.assign(frame.style, {
+      position:'fixed', inset:'0', width:'100%', height:'100%', border:'0',
+      zIndex:'2147483647', background:'#185b9d'
+    });
+    document.body.appendChild(frame);
+
+    frame.onload = () => {
+      try {
+        const w = frame.contentWindow;
+        const d = w.document;
+        w.__sportsFiestaBridgeWinner = winner;
+        w.__sportsFiestaBridgeMode = gm;
+
+        d.body.classList.remove('cover-on');
+        const cover = d.getElementById('fiestaCover');
+        if (cover) cover.style.display = 'none';
+        const app = d.querySelector('.app');
+        if (app) app.style.setProperty('display', 'none', 'important');
+        d.body.style.padding = '0';
+        d.body.style.overflow = 'hidden';
+
+        let started = false;
+        let stage = 'piece';
+        const playPiece = () => {
+          if (started) return;
+          started = true;
+          w.showMedalCeremony(false, winner, 'piece');
+          fillResultText(d, gm, winner, stats);
+        };
+
+        /* Always fetch the small bridge with a fresh version. It does not redraw
+           the ceremony; it only routes P1/P2/tie to the original preview. */
+        const fresh = d.createElement('script');
+        fresh.src = HUB_URL + 'sports-fiesta-award-ui-v2.js?v=20260823previewrestore1';
+        fresh.onload = playPiece;
+        fresh.onerror = playPiece;
+        d.head.appendChild(fresh);
+        setTimeout(playPiece, 900);
+
+        const showGold = () => {
+          stage = 'gold';
+          markGoldAwarded();
+          w.showMedalCeremony(false, 'p1', 'gold');
+          const sub = d.getElementById('mcSub');
+          const msg = d.getElementById('mcMessage');
+          if (sub) sub.textContent = 'All 11 Sports Fiesta 1-player practices completed perfectly!';
+          if (msg) msg.textContent = '🏆 Player 1 receives the Sports Fiesta GOLD MEDAL! 🏆';
+        };
+
+        const close = d.querySelector('#medalCeremony .mc-close');
+        if (close) close.addEventListener('click', () => {
+          if (progress.awardGoldNow && stage === 'piece') setTimeout(showGold, 90);
+          else setTimeout(() => frame.remove(), 0);
+        });
+        d.addEventListener('keydown', e => {
+          if (e.key !== 'Escape') return;
+          if (progress.awardGoldNow && stage === 'piece') setTimeout(showGold, 90);
+          else setTimeout(() => frame.remove(), 0);
+        });
+      } catch (e) {
+        console.warn('Sports Fiesta ceremony could not open', e);
+        frame.remove();
+      }
+    };
+  }
+
+  function addCeremonyNextButton(gm, outcome, progress) {
+    const result = document.getElementById('results');
+    if (!result || !progress.qualifies) return;
+    let btn = document.getElementById('sfCeremonyNext');
+    if (!btn) {
+      btn = document.createElement('button');
+      btn.id = 'sfCeremonyNext';
+      btn.type = 'button';
+      btn.textContent = 'Next →';
+      btn.setAttribute('aria-label', 'Next to medal ceremony');
+      btn.className = 'bigbtn gold';
+      Object.assign(btn.style, {minWidth:'150px', margin:'14px auto 4px', display:'block', fontWeight:'900', fontSize:'20px'});
+      const box = result.querySelector('.results') || result;
+      const firstButton = box.querySelector('button');
+      if (firstButton) box.insertBefore(btn, firstButton); else box.appendChild(btn);
+    }
+    btn.disabled = false;
+    btn.onclick = () => {
+      btn.disabled = true;
+      showCeremony(gm, outcome, progress);
+    };
+  }
+
+  function checkResult() {
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      const result = document.getElementById('results');
+      if (!visible(result)) {
+        handledResult = false;
+        document.getElementById('sfCeremonyNext')?.remove();
+        return;
+      }
+      if (handledResult) return;
+      const gm = getMode();
+      const outcome = resultOutcome(gm);
+      const progress = updateProgress(gm, outcome);
+      handledResult = true;
+      addCeremonyNextButton(gm, outcome, progress);
+    }, 220);
+  }
+
+  new MutationObserver(checkResult).observe(document.documentElement, {
+    subtree:true, childList:true, attributes:true,
+    attributeFilter:['class','style'], characterData:true
+  });
+  window.addEventListener('load', checkResult);
+  checkResult();
 })();
