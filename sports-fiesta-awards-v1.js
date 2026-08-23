@@ -57,7 +57,7 @@
 
   // Shared mastery/fair-play rule for Practices 1–11.
   const retryScript = document.createElement('script');
-  retryScript.src = HUB_URL + 'sports-fiesta-retry-v1.js?v=20260823e';
+  retryScript.src = HUB_URL + 'sports-fiesta-retry-v1.js?v=20260823f';
   retryScript.dataset.practice = String(PRACTICE_ID);
   retryScript.async = false;
   document.head.appendChild(retryScript);
@@ -142,7 +142,7 @@
         }
       }
     }
-    return {p1, p2, c1, c2, total};
+    return {p1, p2, c1, c2, total, text};
   }
 
   function resultOutcome(gm) {
@@ -154,8 +154,17 @@
       };
     }
 
-    // Practice 1 remains a true first-to-finish race.
+    // Practice 1 is a true first-to-finish race. Trust the game's explicit
+    // winner message first, because reaching 6 first is the actual race rule.
     if (PRACTICE_ID === 1) {
+      if (/Player\s*2\s+Wins\s+the\s+Race|Player\s*2\s+reached\s+the\s+finishing\s+line\s+first/i.test(s.text)) {
+        return {winner:'p2', perfect:false};
+      }
+      if (/Player\s*1\s+Wins\s+the\s+Race|Player\s*1\s+reached\s+the\s+finishing\s+line\s+first/i.test(s.text)) {
+        return {winner:'p1', perfect:false};
+      }
+      if (s.c2 != null && s.c2 >= 6 && !(s.c1 != null && s.c1 >= 6)) return {winner:'p2', perfect:false};
+      if (s.c1 != null && s.c1 >= 6 && !(s.c2 != null && s.c2 >= 6)) return {winner:'p1', perfect:false};
       if (s.c1 == null || s.c2 == null) return {winner:'tie', perfect:false};
       return {winner:s.c1===s.c2?'tie':(s.c1>s.c2?'p1':'p2'), perfect:false};
     }
@@ -207,8 +216,8 @@
       ...old,
       completed: true,
       verified: true,
-      source: 'game-v6',
-      awardRules: 'v6-attempt-record',
+      source: 'game-v7',
+      awardRules: 'v7-winner-locked',
       pieceEarned,
       awardQualified: pieceEarned,
       perfectSingle: !!old.perfectSingle || (gm === 1 && outcome.perfect),
@@ -249,6 +258,60 @@
     } catch (_) {}
   }
 
+  function ceremonyPlayerSources(d) {
+    const cards = [...d.querySelectorAll('.playerImgWrap img.playerSvg')];
+    const p1 = d.getElementById('fcP1')?.src || cards[0]?.src || '';
+    const p2 = d.getElementById('fcP2')?.src || cards[1]?.src || '';
+    return {p1,p2};
+  }
+
+  function enforcePieceWinner(d, winner, gm, stats) {
+    const sub = d.getElementById('mcSub');
+    const msg = d.getElementById('mcMessage');
+    const player = d.getElementById('mcPlayer');
+    const player2 = d.getElementById('mcPlayer2');
+    const sources = ceremonyPlayerSources(d);
+
+    if (sub) {
+      const wanted = `Practice ${PRACTICE_ID} of 11 • ${SPORT}`;
+      if (sub.textContent !== wanted) sub.textContent = wanted;
+    }
+
+    if (winner === 'p2' && player && sources.p2 && player.src !== sources.p2) {
+      player.src = sources.p2;
+      player.alt = 'Player 2 on the rostrum';
+    } else if (winner === 'p1' && player && sources.p1 && player.src !== sources.p1) {
+      player.src = sources.p1;
+      player.alt = 'Player 1 on the rostrum';
+    } else if (winner === 'tie') {
+      if (player && sources.p1 && player.src !== sources.p1) {
+        player.src = sources.p1;
+        player.alt = 'Player 1 on the rostrum';
+      }
+      if (player2 && sources.p2 && player2.src !== sources.p2) {
+        player2.src = sources.p2;
+        player2.alt = 'Player 2 on the rostrum';
+        player2.style.removeProperty('display');
+      }
+    }
+
+    if (msg) {
+      const attemptLine = gm===2 && stats
+        ? ` Player 1: ${stats.c1} correct, ${stats.w1} wrong. Player 2: ${stats.c2} correct, ${stats.w2} wrong.`
+        : '';
+      let wanted = '';
+      if (gm === 1) {
+        wanted = 'Perfect score! Player 1 earns a 1/11 medal!';
+      } else if (winner === 'tie') {
+        wanted = 'It is a tie! Player 1 and Player 2 both receive a 1/11 medal!' + attemptLine;
+      } else {
+        const why = stats && stats.c1===stats.c2 && stats.w1!==stats.w2 ? ' with fewer wrong attempts' : '';
+        wanted = `${winner === 'p2' ? 'Player 2' : 'Player 1'} wins${why} and earns a 1/11 medal!` + attemptLine;
+      }
+      if (msg.textContent !== wanted) msg.textContent = wanted;
+    }
+  }
+
   function showCeremony(gm, outcome, progress) {
     const winner = gm === 1 ? 'p1' : outcome.winner;
     const stats = attemptStats();
@@ -276,29 +339,39 @@
         d.body.style.overflow = 'hidden';
 
         let stage = 'piece';
+        let guard = null;
 
         const showPiece = () => {
           w.showMedalCeremony(false, winner, 'piece');
-          const sub = d.getElementById('mcSub');
-          const msg = d.getElementById('mcMessage');
-          if (sub) sub.textContent = `Practice ${PRACTICE_ID} of 11 • ${SPORT}`;
-          if (msg) {
-            const attemptLine = gm===2 && stats
-              ? ` Player 1: ${stats.c1} correct, ${stats.w1} wrong. Player 2: ${stats.c2} correct, ${stats.w2} wrong.`
-              : '';
-            if (gm === 1) {
-              msg.textContent = 'Perfect score! Player 1 earns a 1/11 medal!';
-            } else if (winner === 'tie') {
-              msg.textContent = 'It is a tie! Player 1 and Player 2 both receive a 1/11 medal!' + attemptLine;
-            } else {
-              const why = stats && stats.c1===stats.c2 && stats.w1!==stats.w2 ? ' with fewer wrong attempts' : '';
-              msg.textContent = `${winner === 'p2' ? 'Player 2' : 'Player 1'} wins${why} and earns a 1/11 medal!` + attemptLine;
-            }
+          enforcePieceWinner(d, winner, gm, stats);
+
+          // Some older ceremony code has delayed timers that rewrite the athlete
+          // and final text to Player 1. Keep the correct winner locked throughout
+          // the complete animation, then disconnect the guard.
+          const medal = d.getElementById('medalCeremony');
+          if (medal && w.MutationObserver) {
+            guard?.disconnect?.();
+            guard = new w.MutationObserver(() => {
+              if (stage === 'piece') enforcePieceWinner(d, winner, gm, stats);
+            });
+            guard.observe(medal, {
+              subtree:true,
+              childList:true,
+              characterData:true,
+              attributes:true,
+              attributeFilter:['src','class','style']
+            });
           }
+          [80, 980, 1980, 2300, 3200].forEach(ms => {
+            setTimeout(() => {
+              if (stage === 'piece') enforcePieceWinner(d, winner, gm, stats);
+            }, ms);
+          });
         };
 
         const showGold = () => {
           stage = 'gold';
+          guard?.disconnect?.();
           markGoldAwarded();
           w.showMedalCeremony(false, 'p1', 'gold');
           const sub = d.getElementById('mcSub');
@@ -312,13 +385,19 @@
         const close = d.querySelector('#medalCeremony .mc-close');
         if (close) close.addEventListener('click', () => {
           if (awardGoldNow && stage === 'piece') setTimeout(showGold, 90);
-          else setTimeout(() => frame.remove(), 0);
+          else {
+            guard?.disconnect?.();
+            setTimeout(() => frame.remove(), 0);
+          }
         });
 
         d.addEventListener('keydown', e => {
           if (e.key !== 'Escape') return;
           if (awardGoldNow && stage === 'piece') setTimeout(showGold, 90);
-          else setTimeout(() => frame.remove(), 0);
+          else {
+            guard?.disconnect?.();
+            setTimeout(() => frame.remove(), 0);
+          }
         });
       } catch (e) {
         console.warn('Sports Fiesta ceremony could not open', e);
