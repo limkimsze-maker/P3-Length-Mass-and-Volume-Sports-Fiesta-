@@ -466,6 +466,9 @@
       #sfDebugUnlockV6{background:#5c2aa6;color:#fff;border-radius:999px!important}
       #sfDebugChoicesV6{display:none;gap:7px;flex-wrap:wrap;justify-content:flex-end;background:rgba(255,255,255,.97);border:3px solid #d8c8ff;border-radius:16px;padding:8px}
       #sfDebugPanelV6.unlocked #sfDebugChoicesV6{display:flex}#sfDebugPanelV6.unlocked #sfDebugUnlockV6{display:none}
+      #sfDebugPasswordV6{position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;padding:18px;background:rgba(12,42,75,.82);font-family:"Trebuchet MS",Arial,sans-serif}
+      #sfDebugPasswordV6 form{width:min(390px,94vw);padding:24px;border:4px solid #d8c8ff;border-radius:24px;background:#fff;text-align:center;box-shadow:0 22px 60px rgba(0,0,0,.32)}
+      #sfDebugPasswordV6 h3{margin:0 0 12px;color:#4c258c;font-size:26px}#sfDebugPasswordV6 input{width:160px;height:54px;border:3px solid #bda8e9;border-radius:15px;text-align:center;font-size:28px;font-weight:900;letter-spacing:7px;-webkit-text-security:disc}#sfDebugPasswordV6 .sfDebugPasswordError{min-height:24px;margin-top:8px;color:#c43b3b;font-weight:900}#sfDebugPasswordV6 .sfDebugPasswordActions{display:flex;justify-content:center;gap:9px;margin-top:10px}#sfDebugPasswordV6 button{border:0;border-radius:13px;padding:10px 16px;font-weight:900;cursor:pointer}#sfDebugPasswordV6 button[type="submit"]{background:#5c2aa6;color:#fff}#sfDebugPasswordV6 button[type="button"]{background:#eef1f5;color:#53606d}
       .sfDebugSingleV6{background:#ffe272;color:#5d4300}.sfDebugP1V6{background:#dcecff;color:#144e88}.sfDebugP2V6{background:#ffe0e5;color:#8b2638}.sfDebugTieV6{background:#e6f7e8;color:#246b31}.sfDebugLockV6{background:#eef1f5;color:#53606d}
       @media(max-width:600px){#sfDebugPanelV6{right:7px;bottom:7px}#sfDebugPanelV6 button{padding:7px 9px;font-size:10px}#sfDebugChoicesV6{gap:5px;padding:6px}}
     `;
@@ -494,14 +497,31 @@
     };
 
     panel.querySelector('#sfDebugUnlockV6').onclick = () => {
-      const entered = prompt('DEBUG password');
-      if (entered === null) return;
-      if (entered !== DEBUG_PASS) {
-        alert('Incorrect password.');
-        return;
-      }
-      unlocked = true;
-      render();
+      document.getElementById('sfDebugPasswordV6')?.remove();
+      const overlay = document.createElement('div');
+      overlay.id = 'sfDebugPasswordV6';
+      overlay.innerHTML = `<form><h3>🔒 DEBUG Password</h3><input type="password" inputmode="numeric" maxlength="2" autocomplete="off" aria-label="DEBUG password"><div class="sfDebugPasswordError" aria-live="polite"></div><div class="sfDebugPasswordActions"><button type="submit">Unlock</button><button type="button">Cancel</button></div></form>`;
+      document.body.appendChild(overlay);
+
+      const form = overlay.querySelector('form');
+      const input = overlay.querySelector('input');
+      const error = overlay.querySelector('.sfDebugPasswordError');
+      const close = () => overlay.remove();
+      form.addEventListener('submit', e => {
+        e.preventDefault();
+        if (input.value !== DEBUG_PASS) {
+          error.textContent = 'Incorrect password.';
+          input.value = '';
+          input.focus();
+          return;
+        }
+        unlocked = true;
+        close();
+        render();
+      });
+      overlay.querySelector('button[type="button"]').onclick = close;
+      overlay.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+      setTimeout(() => input.focus(), 0);
     };
 
     choices.addEventListener('click', e => {
