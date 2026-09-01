@@ -597,7 +597,7 @@ body.cover-on{min-height:100dvh}
 <!-- SF_REWARD_UPGRADE_HTML_START -->
 <div id="sfPass" aria-hidden="true"><div class="sfBox">
   <h3>🔒 Teacher Preview</h3><p>Enter the password to preview the medal presentation.</p>
-  <input id="sfPassInput" type="password" inputmode="numeric" maxlength="2" autocomplete="off" aria-label="Preview password">
+  <input id="sfPassInput" type="password" inputmode="numeric" maxlength="4" autocomplete="off" aria-label="Preview password">
   <div id="sfPassError"></div>
   <div class="sfBtns"><button class="sfUnlock" onclick="sfCheckPass()">Unlock</button><button class="sfCancel" onclick="sfClosePass()">Cancel</button></div>
 </div></div>
@@ -911,6 +911,8 @@ function clearResetHold(){
 });
 
 
+const SF_PASS_SALT="sports-fiesta-debug-v1",SF_PASS_HASH="3e735652a878a45e8877394e8363f5f15026eb501b54f792df93425a1a8127a8";
+async function sfPasswordMatches(value){const e=new TextEncoder(),k=await crypto.subtle.importKey("raw",e.encode(value),"PBKDF2",false,["deriveBits"]),b=await crypto.subtle.deriveBits({name:"PBKDF2",salt:e.encode(SF_PASS_SALT),iterations:120000,hash:"SHA-256"},k,256);return[...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,"0")).join("")===SF_PASS_HASH}
 const CEREMONY_SHOWN_KEY="sportsFiestaGoldCeremonyShown_v1";let ceremonyAudioCtx=null,ceremonyTimers=[];
 function ca(){if(!ceremonyAudioCtx){const C=window.AudioContext||window.webkitAudioContext;if(C)ceremonyAudioCtx=new C()}if(ceremonyAudioCtx&&ceremonyAudioCtx.state==="suspended")ceremonyAudioCtx.resume();return ceremonyAudioCtx}
 function ct(f,d=.12,t="triangle",v=.04,delay=0){const c=ca();if(!c)return;const x=c.currentTime+delay,o=c.createOscillator(),g=c.createGain();o.type=t;o.frequency.setValueAtTime(f,x);g.gain.setValueAtTime(.0001,x);g.gain.exponentialRampToValueAtTime(v,x+.01);g.gain.exponentialRampToValueAtTime(.0001,x+d);o.connect(g).connect(c.destination);o.start(x);o.stop(x+d+.03)}
@@ -923,7 +925,7 @@ function showMedalCeremony(preview=false){const e=document.getElementById("medal
 function goSportsFiestaHome(){try{window.top.location.href='https://limkimsze-maker.github.io/P3-Length-Mass-and-Volume-Sports-Fiesta-/';}catch(e){location.href='https://limkimsze-maker.github.io/P3-Length-Mass-and-Volume-Sports-Fiesta-/';}}
 function closeMedalCeremony(){clearCT();const e=document.getElementById("medalCeremony");if(!e)return;e.classList.remove("show");e.setAttribute("aria-hidden","true");e.querySelectorAll(".mc-piece").forEach(x=>x.remove())}
 function maybeAutoGoldCeremony(){if(localStorage.getItem(CEREMONY_SHOWN_KEY)==="1")return;if(document.body.classList.contains("cover-on")){ceremonyTimers.push(setTimeout(maybeAutoGoldCeremony,600));return}showMedalCeremony(false)}
-function unlockCeremonyPreview(){const p=window.prompt("Enter password to preview the gold medal ceremony:");if(p===null)return;if(p.trim()==="67")showMedalCeremony(true);else{ct(180,.15,"sawtooth",.025);window.alert("Incorrect password.")}}
+async function unlockCeremonyPreview(){const p=window.prompt("Enter password to preview the gold medal ceremony:");if(p===null)return;if(await sfPasswordMatches(p.trim()))showMedalCeremony(true);else{ct(180,.15,"sawtooth",.025);window.alert("Incorrect password.")}}
 document.addEventListener("keydown",e=>{if(e.key==="Escape")closeMedalCeremony()});
 
 renderAll();
@@ -967,7 +969,7 @@ window.showMedalCeremony=function(preview=false,winner="p1",kind="gold"){
 };
 window.unlockCeremonyPreview=function(){const o=document.getElementById("sfPass"),i=document.getElementById("sfPassInput"),er=document.getElementById("sfPassError");o.classList.add("show");o.setAttribute("aria-hidden","false");er.textContent="";i.value="";setTimeout(()=>i.focus(),60)};
 window.sfClosePass=function(){const o=document.getElementById("sfPass");o.classList.remove("show");o.setAttribute("aria-hidden","true")};
-window.sfCheckPass=function(){const i=document.getElementById("sfPassInput"),er=document.getElementById("sfPassError");if(i.value==="67"){beep(660,.08);beep(990,.13,.08);sfClosePass();const m=document.getElementById("sfPreviewMenu");m.classList.add("show");m.setAttribute("aria-hidden","false")}else{er.textContent="Incorrect password.";i.value="";i.focus();beep(180,.14,0,"sawtooth",.03)}};
+window.sfCheckPass=async function(){const i=document.getElementById("sfPassInput"),er=document.getElementById("sfPassError");if(await sfPasswordMatches(i.value)){beep(660,.08);beep(990,.13,.08);sfClosePass();const m=document.getElementById("sfPreviewMenu");m.classList.add("show");m.setAttribute("aria-hidden","false")}else{er.textContent="Incorrect password.";i.value="";i.focus();beep(180,.14,0,"sawtooth",.03)}};
 window.sfCloseMenu=function(){const m=document.getElementById("sfPreviewMenu");m.classList.remove("show");m.setAttribute("aria-hidden","true")};
 window.sfPreview=function(w,k){sfCloseMenu();showMedalCeremony(true,w,k)};
 function maybeGold(){if(perfects()===11&&localStorage.getItem(GOLDKEY)!=="1"){setTimeout(()=>showMedalCeremony(false,"p1","gold"),500);return true}if(perfects()<11)localStorage.removeItem(GOLDKEY);return false}
@@ -1008,19 +1010,3 @@ if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",
   blocked.__sf=1;
   window.toggleCompleted=blocked;
   window.togglePerfect=blocked;
-  window.reportFromGame=blocked;
-  if(window.SportsFiestaAward){
-    window.SportsFiestaAward.record=blocked;
-    window.SportsFiestaAward.reset=blocked;
-  }
-  try{ localStorage.removeItem('sportsFiestaPendingAward_v1'); }catch(e){}
-  if(typeof renderAll==='function') renderAll();
-})();
-</script>
-
-<script src="tie-ceremony-two-players-v1.js?v=7062c250ad39"></script>
-<script src="sports-fiesta-award-ui-v2.js?v=20260824returnv4"></script>
-<script src="sports-fiesta-preview-menu-v1.js?v=7062c250ad39"></script>
-</body>
-</html>
-
