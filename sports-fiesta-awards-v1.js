@@ -8,7 +8,17 @@
 
   const HUB_KEY = 'sportsFiestaHubProgress_v1';
   const HUB_URL = 'https://limkimsze-maker.github.io/P3-Length-Mass-and-Volume-Sports-Fiesta-/';
-  const DEBUG_PASS = '1215';
+  const DEBUG_PASS_SALT = 'sports-fiesta-debug-v1';
+  const DEBUG_PASS_HASH = '3e735652a878a45e8877394e8363f5f15026eb501b54f792df93425a1a8127a8';
+
+  async function isDebugPassword(value) {
+    const encoder = new TextEncoder();
+    const key = await crypto.subtle.importKey('raw', encoder.encode(value), 'PBKDF2', false, ['deriveBits']);
+    const bits = await crypto.subtle.deriveBits({
+      name:'PBKDF2', salt:encoder.encode(DEBUG_PASS_SALT), iterations:120000, hash:'SHA-256'
+    }, key, 256);
+    return [...new Uint8Array(bits)].map(byte => byte.toString(16).padStart(2, '0')).join('') === DEBUG_PASS_HASH;
+  }
 
   /* Keep the two small practice-specific presentation fixes. */
   if (PRACTICE_ID === 10 && typeof window.markerStripSVG === 'function') {
@@ -507,9 +517,9 @@
       const input = overlay.querySelector('input');
       const error = overlay.querySelector('.sfDebugPasswordError');
       const close = () => overlay.remove();
-      form.addEventListener('submit', e => {
+      form.addEventListener('submit', async e => {
         e.preventDefault();
-        if (input.value !== DEBUG_PASS) {
+        if (!(await isDebugPassword(input.value))) {
           error.textContent = 'Incorrect password.';
           input.value = '';
           input.focus();
