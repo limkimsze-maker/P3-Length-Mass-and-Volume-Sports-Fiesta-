@@ -8,7 +8,7 @@
 
   const HUB_KEY = 'sportsFiestaHubProgress_v1';
   const HUB_URL = 'https://limkimsze-maker.github.io/P3-Length-Mass-and-Volume-Sports-Fiesta-/';
-  const DEBUG_PASS = '67';
+  const DEBUG_PASS = '1215';
 
   /* Keep the two small practice-specific presentation fixes. */
   if (PRACTICE_ID === 10 && typeof window.markerStripSVG === 'function') {
@@ -500,7 +500,7 @@
       document.getElementById('sfDebugPasswordV6')?.remove();
       const overlay = document.createElement('div');
       overlay.id = 'sfDebugPasswordV6';
-      overlay.innerHTML = `<form><h3>🔒 DEBUG Password</h3><input type="password" inputmode="numeric" maxlength="2" autocomplete="off" aria-label="DEBUG password"><div class="sfDebugPasswordError" aria-live="polite"></div><div class="sfDebugPasswordActions"><button type="submit">Unlock</button><button type="button">Cancel</button></div></form>`;
+      overlay.innerHTML = `<form><h3>🔒 DEBUG Password</h3><input type="password" inputmode="numeric" maxlength="4" autocomplete="off" aria-label="DEBUG password"><div class="sfDebugPasswordError" aria-live="polite"></div><div class="sfDebugPasswordActions"><button type="submit">Unlock</button><button type="button">Cancel</button></div></form>`;
       document.body.appendChild(overlay);
 
       const form = overlay.querySelector('form');
