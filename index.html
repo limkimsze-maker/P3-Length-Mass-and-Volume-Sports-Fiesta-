@@ -1010,3 +1010,18 @@ if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",
   blocked.__sf=1;
   window.toggleCompleted=blocked;
   window.togglePerfect=blocked;
+  window.reportFromGame=blocked;
+  if(window.SportsFiestaAward){
+    window.SportsFiestaAward.record=blocked;
+    window.SportsFiestaAward.reset=blocked;
+  }
+  try{ localStorage.removeItem('sportsFiestaPendingAward_v1'); }catch(e){}
+  if(typeof renderAll==='function') renderAll();
+})();
+</script>
+
+<script src="tie-ceremony-two-players-v1.js?v=7062c250ad39"></script>
+<script src="sports-fiesta-award-ui-v2.js?v=20260824returnv4"></script>
+<script src="sports-fiesta-preview-menu-v1.js?v=20260901hidev2"></script>
+</body>
+</html>
