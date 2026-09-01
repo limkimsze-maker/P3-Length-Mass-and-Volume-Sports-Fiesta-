@@ -2,9 +2,19 @@
   if (window.__sportsFiestaPreviewDebugV5) return;
   window.__sportsFiestaPreviewDebugV5 = true;
 
-  const PASS = '1215';
+  const PASS_SALT = 'sports-fiesta-debug-v1';
+  const PASS_HASH = '3e735652a878a45e8877394e8363f5f15026eb501b54f792df93425a1a8127a8';
   const PREVIEW_PASS = 'sfPreviewPassV5';
   const PREVIEW_MENU = 'sfPreviewMenuV5';
+
+  async function isPassword(value) {
+    const encoder = new TextEncoder();
+    const key = await crypto.subtle.importKey('raw', encoder.encode(value), 'PBKDF2', false, ['deriveBits']);
+    const bits = await crypto.subtle.deriveBits({
+      name:'PBKDF2', salt:encoder.encode(PASS_SALT), iterations:120000, hash:'SHA-256'
+    }, key, 256);
+    return [...new Uint8Array(bits)].map(byte => byte.toString(16).padStart(2, '0')).join('') === PASS_HASH;
+  }
 
   function getMode() {
     try { if (typeof mode !== 'undefined') return Number(mode) === 2 ? 2 : 1; } catch (_) {}
@@ -156,8 +166,8 @@
       input.value = ''; err.textContent = ''; pass.classList.add('show');
       setTimeout(() => input.focus(), 50);
     };
-    const unlock = () => {
-      if (input.value !== PASS) { err.textContent = 'Incorrect password.'; input.value=''; input.focus(); return; }
+    const unlock = async () => {
+      if (!(await isPassword(input.value))) { err.textContent = 'Incorrect password.'; input.value=''; input.focus(); return; }
       pass.classList.remove('show'); menu.classList.add('show');
     };
     document.getElementById('sfPreviewUnlockV5').onclick = unlock;
@@ -289,10 +299,10 @@
       panel.id = 'sfPracticeDebugV5';
       panel.innerHTML = `<button id="sfDebugUnlockV5" type="button">DEBUG</button><div id="sfDebugButtonsV5"></div>`;
       document.body.appendChild(panel);
-      panel.querySelector('#sfDebugUnlockV5').onclick = () => {
+      panel.querySelector('#sfDebugUnlockV5').onclick = async () => {
         const entered = window.prompt('DEBUG password');
         if (entered === null) return;
-        if (entered !== PASS) { window.alert('Incorrect password.'); return; }
+        if (!(await isPassword(entered))) { window.alert('Incorrect password.'); return; }
         debugUnlocked = true;
         sessionStorage.setItem('sportsFiestaDebugUnlocked_v5','1');
         renderDebugButtons();
