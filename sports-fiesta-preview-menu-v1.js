@@ -2,7 +2,7 @@
   if (window.__sportsFiestaPreviewDebugV5) return;
   window.__sportsFiestaPreviewDebugV5 = true;
 
-  const PASS = '67';
+  const PASS = '1215';
   const PREVIEW_PASS = 'sfPreviewPassV5';
   const PREVIEW_MENU = 'sfPreviewMenuV5';
 
@@ -122,7 +122,7 @@
     if (!document.getElementById(PREVIEW_PASS)) {
       const el = document.createElement('div');
       el.id = PREVIEW_PASS;
-      el.innerHTML = `<div class="sf-v5-box"><h3>🔒 Teacher Preview</h3><p>Enter password 67.</p><input id="sfPreviewInputV5" type="password" inputmode="numeric" maxlength="2"><div id="sfPreviewErrorV5"></div><div class="sf-v5-grid"><button class="sf-v5-action" id="sfPreviewUnlockV5">Unlock</button><button class="sf-v5-action sf-v5-cancel" id="sfPreviewCancelV5">Cancel</button></div></div>`;
+      el.innerHTML = `<div class="sf-v5-box"><h3>🔒 Teacher Preview</h3><p>Enter the password.</p><input id="sfPreviewInputV5" type="password" inputmode="numeric" maxlength="4"><div id="sfPreviewErrorV5"></div><div class="sf-v5-grid"><button class="sf-v5-action" id="sfPreviewUnlockV5">Unlock</button><button class="sf-v5-action sf-v5-cancel" id="sfPreviewCancelV5">Cancel</button></div></div>`;
       document.body.appendChild(el);
     }
     if (!document.getElementById(PREVIEW_MENU)) {
